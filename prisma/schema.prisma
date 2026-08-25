@@ -1,0 +1,722 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id                 String    @id @default(uuid())
+  name               String
+  legalName          String?
+  ICE                String?
+  RC                 String?
+  IF                 String?
+  Patente            String?
+  address            String?
+  city               String?
+  defaultCurrency    String    @default("MAD")
+  fiscalYearStart    DateTime?
+  logo               String?
+  enabledModules     Json?
+  subscriptionPlan   String?
+  subscriptionStatus String    @default("Trial")
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  memberships   TenantMembership[]
+  companies     Company[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  activities    Activity[]
+
+  products       Product[]
+  warehouses     Warehouse[]
+  devis          Devis[]
+  devisLines     DevisLine[]
+  salesOrders    SalesOrder[]
+  deliveryNotes  DeliveryNote[]
+  invoices       Invoice[]
+  payments       Payment[]
+  stockMovements StockMovement[]
+  sequences      TenantSequence[]
+
+  purchaseOrders          PurchaseOrder[]
+  supplierReceipts        SupplierReceipt[]
+  supplierBills           SupplierBill[]
+  accounts                Account[]
+  journalEntries          JournalEntry[]
+  accountingPeriods       AccountingPeriod[]
+  physicalInventories     PhysicalInventory[]
+  purchaseOrderLines      PurchaseOrderLine[]
+  journalEntryLines       JournalEntryLine[]
+  creditNotes             CreditNote[]
+  employees               Employee[]
+  payrollRuns             PayrollRun[]
+  payslips                Payslip[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  importJobs              ImportJob[]
+}
+
+model User {
+  id                      String                   @id // Matches Supabase Auth UUID
+  email                   String                   @unique
+  name                    String?
+  locale                  String                   @default("fr")
+  status                  String                   @default("active")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  importJobs              ImportJob[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  memberships   TenantMembership[]
+  opportunities Opportunity[]
+  activities    Activity[]
+}
+
+enum Role {
+  Owner
+  Admin
+  Sales
+  Accountant
+  Viewer
+}
+
+model TenantMembership {
+  id         String    @id @default(uuid())
+  userId     String
+  tenantId   String
+  role       Role      @default(Viewer)
+  invitedAt  DateTime  @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+}
+
+model Company {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  name                    String
+  ICE                     String?
+  IF                      String?
+  RC                      String?
+  address                 String?
+  city                    String?
+  type                    String // e.g., 'customer', 'prospect', 'supplier'
+  defaultPaymentTermsDays Int      @default(30)
+  tags                    String[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contacts      Contact[]
+  opportunities Opportunity[]
+  activities    Activity[]
+
+  devis       Devis[]
+  salesOrders SalesOrder[]
+  invoices    Invoice[]
+
+  purchaseOrders PurchaseOrder[]
+  supplierBills  SupplierBill[]
+  creditNotes    CreditNote[]
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  tenantId  String
+  companyId String?
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  jobTitle  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunities Opportunity[]
+  activities    Activity[]
+}
+
+model Opportunity {
+  id                String    @id @default(uuid())
+  tenantId          String
+  companyId         String
+  contactId         String?
+  ownerId           String
+  title             String
+  stage             String    @default("New") // New, Qualified, DevisSent, Won, Lost
+  estimatedValue    Float     @default(0)
+  expectedCloseDate DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact    Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  owner      User       @relation(fields: [ownerId], references: [id])
+  activities Activity[]
+}
+
+model Activity {
+  id       String @id @default(uuid())
+  tenantId String
+  ownerId  String
+
+  companyId     String?
+  contactId     String?
+  opportunityId String?
+
+  type      String // call, meeting, note, task
+  content   String
+  dueDate   DateTime?
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner       User         @relation(fields: [ownerId], references: [id])
+  company     Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------
+model Product {
+  id            String   @id @default(uuid())
+  tenantId      String
+  reference     String?
+  name          String
+  description   String?
+  type          String // 'good' or 'service'
+  unit          String   @default("unit")
+  salesPrice    Float    @default(0)
+  purchasePrice Float    @default(0)
+  standardCost  Float    @default(0)
+  averageCost   Float    @default(0)
+  tvaRate       Float    @default(20) // 0, 7, 10, 14, 20
+  trackStock    Boolean  @default(false)
+  category      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devisLines         DevisLine[]
+  stockLevels        StockLevel[]
+  stockMovements     StockMovement[]
+  purchaseOrderLines PurchaseOrderLine[]
+}
+
+// ---------------------------------------------------------
+// Commercial Documents
+// ---------------------------------------------------------
+model Devis {
+  id            String    @id @default(uuid())
+  tenantId      String
+  number        String
+  companyId     String
+  contactId     String?
+  opportunityId String?
+  date          DateTime  @default(now())
+  validUntil    DateTime?
+  status        String    @default("Draft") // Draft, Sent, Accepted, Refused, Converted
+  subtotal      Float     @default(0)
+  tvaAmount     Float     @default(0)
+  total         Float     @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id])
+  lines       DevisLine[]
+  salesOrders SalesOrder[] // Link to converted orders
+}
+
+model DevisLine {
+  id              String @id @default(uuid())
+  tenantId        String
+  devisId         String
+  productId       String
+  description     String
+  quantity        Float  @default(1)
+  unitPrice       Float  @default(0)
+  tvaRate         Float  @default(20)
+  discountPercent Float  @default(0)
+  lineTotal       Float  @default(0)
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devis   Devis   @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model SalesOrder {
+  id        String   @id @default(uuid())
+  tenantId  String
+  number    String
+  devisId   String?
+  companyId String
+  date      DateTime @default(now())
+  status    String   @default("Draft") // Draft, Confirmed, Delivered, Cancelled
+  subtotal  Float    @default(0)
+  tvaAmount Float    @default(0)
+  total     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company        @relation(fields: [companyId], references: [id])
+  devis         Devis?         @relation(fields: [devisId], references: [id])
+  invoices      Invoice[]
+  deliveryNotes DeliveryNote[]
+}
+
+model DeliveryNote {
+  id           String   @id @default(uuid())
+  tenantId     String
+  number       String
+  salesOrderId String
+  warehouseId  String?
+  date         DateTime @default(now())
+  status       String   @default("Draft") // Draft, Delivered, Cancelled
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
+  invoices   Invoice[]
+}
+
+model Invoice {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  number              String
+  companyId           String
+  salesOrderId        String?
+  deliveryNoteId      String?
+  date                DateTime  @default(now())
+  dueDate             DateTime?
+  status              String    @default("Draft") // Draft, Finalized, Sent, Paid, Overdue, Cancelled
+  subtotal            Float     @default(0)
+  tvaAmount           Float     @default(0)
+  total               Float     @default(0)
+  amountPaid          Float     @default(0)
+  amountDue           Float     @default(0)
+  ublXml              String?
+  dgiSubmissionStatus String    @default("NotApplicable")
+  dgiClearanceId      String?
+  dgiSubmittedAt      DateTime?
+  dgiClearedAt        DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company      Company       @relation(fields: [companyId], references: [id])
+  salesOrder   SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  deliveryNote DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
+  payments     Payment[]
+  creditNotes  CreditNote[]
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  invoiceId String
+  date      DateTime @default(now())
+  amount    Float
+  method    String // cash, chèque, virement, etc.
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// INV — Inventory / Warehouse
+// ---------------------------------------------------------
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  address   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockLevels StockLevel[]
+  movements   StockMovement[]
+}
+
+model StockLevel {
+  id          String   @id @default(uuid())
+  tenantId    String
+  productId   String
+  warehouseId String
+  quantity    Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+}
+
+model StockMovement {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  productId          String
+  warehouseId        String
+  quantity           Float // Positive for IN, negative for OUT
+  reason             String // SalesDelivery, PurchaseReceipt, ManualAdjustment
+  note               String? // Required for ManualAdjustment
+  sourceDocumentType String? // 'DeliveryNote', 'GoodsReceipt', etc.
+  sourceDocumentId   String?
+  date               DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+}
+
+// Global Sequence Tracker for Gapless numbering
+model TenantSequence {
+  id        String   @id @default(uuid())
+  tenantId  String
+  type      String // 'Devis', 'Invoice', etc.
+  year      Int
+  nextValue Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, year])
+}
+
+// ---------------------------------------------------------
+// Purchasing / Accounts Payable (MM/AP)
+// ---------------------------------------------------------
+
+model PurchaseOrder {
+  id           String    @id @default(uuid())
+  tenantId     String
+  number       String
+  companyId    String // Supplier
+  date         DateTime  @default(now())
+  expectedDate DateTime?
+  status       String    @default("Draft") // Draft, Sent, Confirmed, Received, Cancelled
+  subtotal     Float     @default(0)
+  tvaAmount    Float     @default(0)
+  total        Float     @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company  Company             @relation(fields: [companyId], references: [id])
+  lines    PurchaseOrderLine[]
+  receipts SupplierReceipt[]
+  bills    SupplierBill[]
+}
+
+model PurchaseOrderLine {
+  id              String @id @default(uuid())
+  tenantId        String
+  purchaseOrderId String
+  productId       String
+  description     String
+  quantity        Float  @default(1)
+  receivedQty     Float  @default(0)
+  unitPrice       Float  @default(0)
+  tvaRate         Float  @default(20)
+  lineTotal       Float  @default(0)
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+}
+
+model SupplierReceipt {
+  id              String   @id @default(uuid())
+  tenantId        String
+  number          String
+  purchaseOrderId String
+  warehouseId     String?
+  date            DateTime @default(now())
+  status          String   @default("Draft") // Draft, Received, Cancelled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  bills         SupplierBill[]
+}
+
+model SupplierBill {
+  id                String    @id @default(uuid())
+  tenantId          String
+  number            String // Internal number
+  supplierReference String? // Supplier's invoice number
+  companyId         String
+  purchaseOrderId   String?
+  supplierReceiptId String?
+  date              DateTime  @default(now())
+  dueDate           DateTime?
+  status            String    @default("Draft") // Draft, Posted, Paid, Cancelled
+  subtotal          Float     @default(0)
+  tvaAmount         Float     @default(0)
+  total             Float     @default(0)
+  amountPaid        Float     @default(0)
+  amountDue         Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company         Company          @relation(fields: [companyId], references: [id])
+  purchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  supplierReceipt SupplierReceipt? @relation(fields: [supplierReceiptId], references: [id])
+}
+
+// ---------------------------------------------------------
+// Accounting / General Ledger (FICO)
+// ---------------------------------------------------------
+
+model Account {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  type        String // Asset, Liability, Equity, Revenue, Expense
+  isActive    Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  JournalEntryLine[]
+
+  @@unique([tenantId, code])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  number      String
+  date        DateTime @default(now())
+  description String
+  status      String   @default("Draft") // Draft, Posted, Voided
+  sourceType  String? // 'Invoice', 'Payment', 'SupplierBill', 'Manual'
+  sourceId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  JournalEntryLine[]
+}
+
+model JournalEntryLine {
+  id             String  @id @default(uuid())
+  tenantId       String
+  journalEntryId String
+  accountId      String
+  debit          Float   @default(0)
+  credit         Float   @default(0)
+  description    String?
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id])
+}
+
+model AccountingPeriod {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String // '2026-01', 'Q1-2026'
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("Open") // Open, Closed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, startDate, endDate])
+}
+
+// ---------------------------------------------------------
+// Advanced Inventory / Physical Counts
+// ---------------------------------------------------------
+
+model PhysicalInventory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  warehouseId String
+  date        DateTime @default(now())
+  status      String   @default("Draft") // Draft, Counted, Adjusted
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// SD — Returns & Credit Notes (Avoirs)
+// ---------------------------------------------------------
+
+model CreditNote {
+  id        String   @id @default(uuid())
+  tenantId  String
+  number    String // AV-2026-00001
+  invoiceId String?
+  companyId String
+  date      DateTime @default(now())
+  status    String   @default("Draft") // Draft, Finalized, Cancelled
+  reason    String? // Return, CommercialDiscount, Error
+  subtotal  Float    @default(0)
+  tvaAmount Float    @default(0)
+  total     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company  @relation(fields: [companyId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+}
+
+// ---------------------------------------------------------
+// HR & Moroccan Payroll (HCM)
+// ---------------------------------------------------------
+
+model Employee {
+  id           String   @id @default(uuid())
+  tenantId     String
+  firstName    String
+  lastName     String
+  cin          String? // Moroccan CIN
+  cnssNumber   String? // Moroccan CNSS
+  email        String?
+  phone        String?
+  department   String? // Direction, Commercial, Technique, Logistique, Finance
+  jobTitle     String
+  hireDate     DateTime @default(now())
+  contractType String   @default("CDI") // CDI, CDD, Anapec, Stage
+  baseSalary   Float    @default(0) // Salaire Brut de base mensuel (MAD)
+  status       String   @default("Active") // Active, Inactive, Terminated
+  bankName     String?
+  bankRIB      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslips Payslip[]
+}
+
+model PayrollRun {
+  id         String   @id @default(uuid())
+  tenantId   String
+  period     String // e.g. "2026-08"
+  date       DateTime @default(now())
+  totalGross Float    @default(0)
+  totalNet   Float    @default(0)
+  totalCnss  Float    @default(0)
+  totalIgr   Float    @default(0)
+  status     String   @default("Draft") // Draft, Processed, Closed
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslips Payslip[]
+}
+
+model Payslip {
+  id            String    @id @default(uuid())
+  tenantId      String
+  payrollRunId  String
+  employeeId    String
+  period        String // e.g. "2026-08"
+  grossSalary   Float     @default(0) // Salaire Brut
+  cnssDeduction Float     @default(0) // 4.48% (plafond 6000 DH = 268.80 DH)
+  amoDeduction  Float     @default(0) // 2.26% (non plafonné)
+  fraisPro      Float     @default(0) // 35% déduction forfaitaire (plafond 2916.67 DH)
+  netTaxable    Float     @default(0) // Salaire Net Imposable (SNI)
+  igrDeduction  Float     @default(0) // Impôt sur le Revenu (IGR)
+  netSalary     Float     @default(0) // Salaire Net à Payer
+  paidDate      DateTime?
+  status        String    @default("Generated") // Generated, Paid
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// Notifications & Imports
+// ---------------------------------------------------------
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      String
+  title     String
+  message   String
+  actionUrl String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+  id       String  @id @default(uuid())
+  userId   String
+  tenantId String
+  type     String
+  email    Boolean @default(true)
+  inApp    Boolean @default(true)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, type])
+}
+
+model ImportJob {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  entityType  String
+  status      String
+  totalRows   Int      @default(0)
+  successRows Int      @default(0)
+  errorRows   Int      @default(0)
+  errorLog    Json?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
