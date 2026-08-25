@@ -10,6 +10,8 @@ export const dictionaries = {
       settings: "Settings",
       logout: "Log out",
       loading: "Loading...",
+      companies: "Companies",
+      contacts: "Contacts",
     },
     sidebar: {
       finance: "Finance",
@@ -51,6 +53,17 @@ export const dictionaries = {
       noLiabilities: "No liability accounts found.",
       noRevenue: "No revenue accounts found.",
     },
+    crm: {
+      pipelineTitle: "Sales Pipeline",
+      pipelineSubtitle: "Track your deals across every stage.",
+      newLead: "New Lead",
+      qualified: "Qualified",
+      devisSent: "Quote Sent",
+      won: "Won",
+      lost: "Lost",
+      noDeals: "No deals",
+      newOpportunity: "New Opportunity",
+    }
   },
   fr: {
     common: {
@@ -63,6 +76,8 @@ export const dictionaries = {
       settings: "Paramètres",
       logout: "Déconnexion",
       loading: "Chargement...",
+      companies: "Entreprises",
+      contacts: "Contacts",
     },
     sidebar: {
       finance: "Finance",
@@ -104,6 +119,17 @@ export const dictionaries = {
       noLiabilities: "Aucun compte de passif trouvé.",
       noRevenue: "Aucun compte de produit trouvé.",
     },
+    crm: {
+      pipelineTitle: "Pipeline Commercial",
+      pipelineSubtitle: "Suivez vos opportunités à chaque étape.",
+      newLead: "Nouveau Prospect",
+      qualified: "Qualifié",
+      devisSent: "Devis Envoyé",
+      won: "Gagné",
+      lost: "Perdu",
+      noDeals: "Aucune opportunité",
+      newOpportunity: "Nouvelle Opportunité",
+    }
   },
 };
 

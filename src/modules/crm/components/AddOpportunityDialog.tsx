@@ -29,11 +29,12 @@ interface Company {
 
 interface AddOpportunityDialogProps {
   companies: Company[];
+  buttonLabel?: string;
 }
 
 const STAGES = ["New", "Qualified", "DevisSent", "Won", "Lost"];
 
-export function AddOpportunityDialog({ companies }: AddOpportunityDialogProps) {
+export function AddOpportunityDialog({ companies, buttonLabel = "New Opportunity" }: AddOpportunityDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -74,7 +75,7 @@ export function AddOpportunityDialog({ companies }: AddOpportunityDialogProps) {
       <DialogTrigger render={
         <Button size="sm">
           <PlusIcon className="h-4 w-4 mr-1" />
-          New Opportunity
+          {buttonLabel}
         </Button>
       } />
 
