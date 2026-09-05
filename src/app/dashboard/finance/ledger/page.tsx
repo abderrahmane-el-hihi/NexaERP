@@ -42,8 +42,8 @@ export default async function LedgerPage() {
                 </tr>
               ) : (
                 entries.map((entry) => {
-                  const totalDebit = entry.lines.reduce((sum: number, line: any) => sum + line.debit, 0);
-                  const totalCredit = entry.lines.reduce((sum: number, line: any) => sum + line.credit, 0);
+                  const totalDebit: number = entry.lines.reduce((sum, line) => sum + Number(line.debit), 0 as number);
+                  const totalCredit: number = entry.lines.reduce((sum, line) => sum + Number(line.credit), 0 as number);
 
                   return (
                     <tr key={entry.id} className="hover:bg-slate-50 transition-colors">

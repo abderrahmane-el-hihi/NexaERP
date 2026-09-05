@@ -4,10 +4,11 @@ import { updateOpportunityStage } from "@/modules/crm/services/opportunity.servi
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import type { OpportunityView } from "@/shared/view-types";
 
 const STAGES = ["New", "Qualified", "DevisSent", "Won", "Lost"];
 
-export function OpportunityCard({ opp }: { opp: any }) {
+export function OpportunityCard({ opp }: { opp: OpportunityView }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 

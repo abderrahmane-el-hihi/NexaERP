@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
-import { ensureStandardCOA } from "@/modules/finance/services/coa.service";
+import { withTenant } from "@/shared/db/prisma";
+import { seedAccountingFoundation } from "@/modules/finance/services/coa.service";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -35,7 +35,7 @@ export async function createNewEnterprise(input: CreateEnterpriseInput) {
     : ["CRM", "SD", "MM", "INV", "FI", "COMP", "DOC"];
 
   // Run in a transaction to ensure everything is created together
-  const tenant = await prisma.$transaction(async (tx) => {
+  const tenant = await withTenant(tenantId, async (tx) => {
     // 1. Create Tenant Record
     const t = await tx.tenant.create({
       data: {
@@ -79,8 +79,9 @@ export async function createNewEnterprise(input: CreateEnterpriseInput) {
     return t;
   });
 
-  // 4. Provision Moroccan Chart of Accounts (COA Classes 1-7)
-  await ensureStandardCOA(tenantId);
+  // 4. Provision the Moroccan chart of accounts, journals, VAT rates and the
+  //    accounting calendar so the tenant can post from its first minute.
+  await withTenant(tenantId, (tx) => seedAccountingFoundation(tx, tenantId));
 
   // 5. Set Active Tenant Cookie
   const cookieStore = await cookies();

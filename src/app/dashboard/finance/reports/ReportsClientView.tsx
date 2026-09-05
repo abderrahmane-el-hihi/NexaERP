@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { BookOpenIcon, CalculatorIcon, ArrowTrendingUpIcon, BuildingLibraryIcon, ClockIcon, CheckCircleIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import type { AgeingReport, BalanceSheetView, IncomeStatementView, TrialBalanceRow } from "@/shared/view-types";
 
 interface ReportsClientViewProps {
-  trialBalance: any[];
-  cpc: any;
-  bilan: any;
-  arAging: any;
-  apAging: any;
+  trialBalance: TrialBalanceRow[];
+  cpc: IncomeStatementView;
+  bilan: BalanceSheetView;
+  arAging: AgeingReport;
+  apAging: AgeingReport;
 }
 
 export function ReportsClientView({
@@ -189,7 +190,7 @@ export function ReportsClientView({
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-bold text-base text-emerald-950 flex items-center gap-2">
                   <ArrowTrendingUpIcon className="h-5 w-5 text-emerald-600" />
-                  Produits d'Exploitation (Class 7)
+                  Produits d&apos;Exploitation (Class 7)
                 </h3>
                 <span className="font-bold text-emerald-700">
                   {formatMoney(cpc.totalOperatingRevenue)}
@@ -200,7 +201,7 @@ export function ReportsClientView({
                 {cpc.operatingRevenues.length === 0 ? (
                   <p className="text-muted-foreground text-xs italic">No sales revenue posted yet.</p>
                 ) : (
-                  cpc.operatingRevenues.map((r: any) => (
+                  cpc.operatingRevenues.map((r) => (
                     <div key={r.code} className="flex justify-between py-1 border-b border-muted/50">
                       <span className="text-muted-foreground">
                         <strong className="font-mono text-foreground">{r.code}</strong> {r.name}
@@ -217,7 +218,7 @@ export function ReportsClientView({
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-bold text-base text-red-950 flex items-center gap-2">
                   <CalculatorIcon className="h-5 w-5 text-red-600" />
-                  Charges d'Exploitation (Class 6)
+                  Charges d&apos;Exploitation (Class 6)
                 </h3>
                 <span className="font-bold text-red-700">
                   {formatMoney(cpc.totalOperatingExpenses)}
@@ -228,7 +229,7 @@ export function ReportsClientView({
                 {cpc.operatingExpenses.length === 0 ? (
                   <p className="text-muted-foreground text-xs italic">No operating expenses posted yet.</p>
                 ) : (
-                  cpc.operatingExpenses.map((e: any) => (
+                  cpc.operatingExpenses.map((e) => (
                     <div key={e.code} className="flex justify-between py-1 border-b border-muted/50">
                       <span className="text-muted-foreground">
                         <strong className="font-mono text-foreground">{e.code}</strong> {e.name}
@@ -245,7 +246,7 @@ export function ReportsClientView({
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl p-6 shadow-md flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-300 font-mono">SYNTHÈSE DU COMPTE DE PRODUITS ET CHARGES</p>
-              <h2 className="text-xl font-bold mt-1">Résultat Net d'Exploitation</h2>
+              <h2 className="text-xl font-bold mt-1">Résultat Net d&apos;Exploitation</h2>
             </div>
             <div className="text-right">
               <p
@@ -278,7 +279,7 @@ export function ReportsClientView({
 
             <div className="space-y-3 text-sm">
               <p className="font-semibold text-xs text-slate-500 uppercase">Actif Circulant (Class 3)</p>
-              {bilan.actifCirculant.map((a: any) => (
+              {bilan.actifCirculant.map((a) => (
                 <div key={a.code} className="flex justify-between py-1 border-b border-muted/50">
                   <span className="text-muted-foreground">
                     <strong className="font-mono text-foreground">{a.code}</strong> {a.name}
@@ -288,7 +289,7 @@ export function ReportsClientView({
               ))}
 
               <p className="font-semibold text-xs text-slate-500 uppercase pt-2">Trésorerie-Actif (Class 5)</p>
-              {bilan.tresorerieActif.map((t: any) => (
+              {bilan.tresorerieActif.map((t) => (
                 <div key={t.code} className="flex justify-between py-1 border-b border-muted/50">
                   <span className="text-muted-foreground">
                     <strong className="font-mono text-foreground">{t.code}</strong> {t.name}
@@ -313,13 +314,13 @@ export function ReportsClientView({
               <p className="font-semibold text-xs text-slate-500 uppercase">Capitaux Propres (Résultat Net)</p>
               <div className="flex justify-between py-1 border-b border-muted/50">
                 <span className="text-muted-foreground">
-                  <strong className="font-mono text-foreground">1191</strong> Résultat Net de l'Exercice
+                  <strong className="font-mono text-foreground">1191</strong> Résultat Net de l&apos;Exercice
                 </span>
                 <span className="font-semibold">{formatMoney(bilan.equityResult)}</span>
               </div>
 
               <p className="font-semibold text-xs text-slate-500 uppercase pt-2">Passif Circulant (Class 4)</p>
-              {bilan.passifCirculant.map((p: any) => (
+              {bilan.passifCirculant.map((p) => (
                 <div key={p.code} className="flex justify-between py-1 border-b border-muted/50">
                   <span className="text-muted-foreground">
                     <strong className="font-mono text-foreground">{p.code}</strong> {p.name}

@@ -5,6 +5,7 @@ import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { updateInvoice } from "@/modules/sales/services/invoice.service";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { messageOf } from "@/shared/errors";
 
 export function FinalizeInvoiceButton({ invoiceId }: { invoiceId: string }) {
   const router = useRouter();
@@ -17,8 +18,8 @@ export function FinalizeInvoiceButton({ invoiceId }: { invoiceId: string }) {
     try {
       await updateInvoice(invoiceId, { status: "Finalized" });
       router.refresh();
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (err: unknown) {
+      alert("Error: " + messageOf(err));
       setIsFinalizing(false);
     }
   }

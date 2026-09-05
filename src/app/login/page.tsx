@@ -78,7 +78,7 @@ export default function LoginPage(props: {
             </form>
             
             <div className="mt-8 text-center text-sm text-gray-400">
-              Don't have an account? <Link href="/signup" className="text-white hover:text-[#f06e53] font-medium transition-colors">Start your free trial</Link>
+              Don&apos;t have an account? <Link href="/signup" className="text-white hover:text-[#f06e53] font-medium transition-colors">Start your free trial</Link>
             </div>
           </div>
         </div>

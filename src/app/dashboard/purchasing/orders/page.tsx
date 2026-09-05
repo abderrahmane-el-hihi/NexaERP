@@ -63,7 +63,7 @@ export default async function PurchaseOrdersPage() {
               {orders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    No purchase orders found. Click "Create Purchase Order" to get started.
+                    No purchase orders found. Click &quot;Create Purchase Order&quot; to get started.
                   </td>
                 </tr>
               ) : (

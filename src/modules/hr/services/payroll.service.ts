@@ -1,226 +1,202 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
-import { getNextSequenceNumber } from "@/modules/sales/services/sequence.service";
+import { Prisma } from "@/generated/prisma/client";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
-
+import { dec, serialize, sum } from "@/shared/money";
+import { domainError } from "@/shared/errors";
+import { audit } from "@/modules/platform/services/audit.service";
+import { postEntry } from "@/modules/finance/services/posting.service";
 import { calculateMoroccanPayroll, type MoroccanPayrollCalculation } from "../utils/payroll-calculator";
 
 export type { MoroccanPayrollCalculation };
 
+/**
+ * Payroll.
+ *
+ * WARNING: CNSS, AMO and IR rules change with every Loi de Finances and vary by
+ * collective agreement. The calculator in ../utils is a convenience, not a source of
+ * legal truth — verify the brackets against the current year before relying on it, and
+ * prefer importing the journal entry from the payroll provider (blueprint §5.9).
+ *
+ * What this module guarantees is the accounting: the payroll entry is balanced and
+ * posted through the same engine as every other document.
+ */
+
 export async function getEmployees() {
   const tenantId = await getTenantId();
-
-  // Ensure default demo employees exist if table is empty
-  const count = await prisma.employee.count({ where: { tenantId } });
-  if (count === 0) {
-    await prisma.employee.createMany({
-      data: [
-        {
-          tenantId,
-          firstName: "Mehdi",
-          lastName: "Tazi",
-          cin: "BE876543",
-          cnssNumber: "198765432",
-          email: "mehdi.tazi@atlasdistribution.ma",
-          department: "Commercial",
-          jobTitle: "Directeur Commercial",
-          contractType: "CDI",
-          baseSalary: 14000,
-          status: "Active",
-          bankName: "Attijariwafa Bank",
-          bankRIB: "007 780 0001234567890123 45",
-        },
-        {
-          tenantId,
-          firstName: "Salma",
-          lastName: "Bennani",
-          cin: "BK654321",
-          cnssNumber: "287654321",
-          email: "salma.bennani@atlasdistribution.ma",
-          department: "Finance",
-          jobTitle: "Responsable Comptable",
-          contractType: "CDI",
-          baseSalary: 9500,
-          status: "Active",
-          bankName: "Banque Populaire (BCP)",
-          bankRIB: "123 456 0009876543210987 12",
-        },
-      ],
-    });
-  }
-
-  return await prisma.employee.findMany({
-    where: { tenantId },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.employee.findMany({
+      where: { tenantId },
+      orderBy: [{ status: "asc" }, { lastName: "asc" }],
+    })
+  );
+  return serialize(rows);
 }
 
 export async function createEmployee(data: {
   firstName: string;
   lastName: string;
+  jobTitle: string;
+  baseSalary: number | string;
   cin?: string;
   cnssNumber?: string;
   email?: string;
   phone?: string;
   department?: string;
-  jobTitle: string;
-  contractType: string;
-  baseSalary: number;
+  contractType?: string;
+  hireDate?: Date;
+  bankName?: string;
+  bankRIB?: string;
 }) {
   const tenantId = await getTenantId();
-  return await prisma.employee.create({
-    data: {
-      tenantId,
-      ...data,
-      status: "Active",
-    },
+
+  return withTenant(tenantId, async (tx) => {
+    const employee = await tx.employee.create({
+      data: {
+        tenantId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        jobTitle: data.jobTitle,
+        baseSalary: new Prisma.Decimal(dec(data.baseSalary).toFixed(6)),
+        cin: data.cin ?? null,
+        cnssNumber: data.cnssNumber ?? null,
+        email: data.email ?? null,
+        phone: data.phone ?? null,
+        department: data.department ?? null,
+        contractType: data.contractType ?? "CDI",
+        hireDate: data.hireDate ?? new Date(),
+        bankName: data.bankName ?? null,
+        bankRIB: data.bankRIB ?? null,
+      },
+    });
+    await audit(tx, { tenantId, entityType: "Employee", entityId: employee.id, action: "CREATE" });
+    return serialize(employee);
   });
 }
 
 export async function getPayrollRuns() {
   const tenantId = await getTenantId();
-  return await prisma.payrollRun.findMany({
-    where: { tenantId },
-    include: {
-      payslips: {
-        include: { employee: true },
-      },
-    },
-    orderBy: { period: "desc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.payrollRun.findMany({
+      where: { tenantId },
+      include: { payslips: { include: { employee: true } } },
+      orderBy: { period: "desc" },
+    })
+  );
+  return serialize(rows);
 }
 
 /**
- * Runs monthly payroll for all active employees, generates payslips,
- * and auto-posts balanced payroll journal entries to the General Ledger.
+ * Runs payroll for a period and posts the resulting entry:
+ *   Dr 6171 Rémunérations du personnel   (gross)
+ *      Cr 4432 Personnel — rémunérations dues   (net)
+ *      Cr 4441 CNSS et organismes sociaux       (social contributions)
+ *      Cr 4452 État — impôts et taxes           (IR withheld)
  */
 export async function runMonthlyPayroll(period: string) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
 
-  return await prisma.$transaction(async (tx) => {
-    const employees = await tx.employee.findMany({
-      where: { tenantId, status: "Active" },
-    });
+  if (!/^\d{4}-\d{2}$/.test(period)) {
+    throw domainError("VALIDATION_FAILED", "Période attendue au format AAAA-MM");
+  }
 
-    if (employees.length === 0) throw new Error("No active employees found");
+  return withTenant(tenantId, async (tx) => {
+    const existing = await tx.payrollRun.findFirst({ where: { tenantId, period } });
+    if (existing) {
+      throw domainError("DUPLICATE_DOCUMENT", `La paie ${period} a déjà été traitée`, {
+        payrollRunId: existing.id,
+      });
+    }
 
-    let totalGross = 0;
-    let totalNet = 0;
-    let totalCnss = 0;
-    let totalIgr = 0;
+    const employees = await tx.employee.findMany({ where: { tenantId, status: "Active" } });
+    if (employees.length === 0) {
+      throw domainError("VALIDATION_FAILED", "Aucun salarié actif");
+    }
 
-    const payslipData = employees.map((emp) => {
-      const calc = calculateMoroccanPayroll(emp.baseSalary);
-      totalGross += calc.grossSalary;
-      totalNet += calc.netSalary;
-      totalCnss += calc.cnssDeduction + calc.amoDeduction;
-      totalIgr += calc.igrDeduction;
+    const calculations = employees.map((employee) => ({
+      employee,
+      calc: calculateMoroccanPayroll(Number(employee.baseSalary)),
+    }));
 
-      return {
-        tenantId,
-        employeeId: emp.id,
-        period,
-        grossSalary: calc.grossSalary,
-        cnssDeduction: calc.cnssDeduction,
-        amoDeduction: calc.amoDeduction,
-        fraisPro: calc.fraisPro,
-        netTaxable: calc.netTaxable,
-        igrDeduction: calc.igrDeduction,
-        netSalary: calc.netSalary,
-        status: "Generated",
-      };
-    });
+    const totalGross = sum(calculations.map((c) => c.calc.grossSalary));
+    const totalNet = sum(calculations.map((c) => c.calc.netSalary));
+    const totalCnss = sum(calculations.map((c) => c.calc.cnssDeduction + c.calc.amoDeduction));
+    const totalIgr = sum(calculations.map((c) => c.calc.igrDeduction));
 
-    // Create or update PayrollRun
-    const payrollRun = await tx.payrollRun.create({
+    const [year, month] = period.split("-").map(Number);
+    const runDate = new Date(Date.UTC(year, month, 0));
+
+    const run = await tx.payrollRun.create({
       data: {
         tenantId,
         period,
-        totalGross,
-        totalNet,
-        totalCnss,
-        totalIgr,
+        date: runDate,
         status: "Processed",
+        totalGross: new Prisma.Decimal(totalGross.toFixed(6)),
+        totalNet: new Prisma.Decimal(totalNet.toFixed(6)),
+        totalCnss: new Prisma.Decimal(totalCnss.toFixed(6)),
+        totalIgr: new Prisma.Decimal(totalIgr.toFixed(6)),
         payslips: {
-          create: payslipData,
-        },
-      },
-      include: {
-        payslips: { include: { employee: true } },
-      },
-    });
-
-    // Ensure Standard Payroll Accounts exist
-    const [acc6171, acc4432, acc4441, acc4452] = await Promise.all([
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "6171" } },
-        update: {},
-        create: { tenantId, code: "6171", name: "Rémunérations du personnel", type: "Expense" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4432" } },
-        update: {},
-        create: { tenantId, code: "4432", name: "Rémunérations dues au personnel", type: "Liability" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4441" } },
-        update: {},
-        create: { tenantId, code: "4441", name: "Organismes sociaux - CNSS", type: "Liability" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4452" } },
-        update: {},
-        create: { tenantId, code: "4452", name: "État - IGR retenu à la source", type: "Liability" },
-      }),
-    ]);
-
-    // Post balanced Payroll Journal Entry to General Ledger
-    const journalNumber = await getNextSequenceNumber(tenantId, "JournalEntry", year);
-    await tx.journalEntry.create({
-      data: {
-        tenantId,
-        number: journalNumber,
-        description: `Paie et Salaires du Personnel - Période ${period}`,
-        sourceType: "Payroll",
-        sourceId: payrollRun.id,
-        status: "Posted",
-        lines: {
-          create: [
-            {
-              tenantId,
-              accountId: acc6171.id,
-              debit: totalGross,
-              credit: 0,
-              description: `Charges salariales brutes - ${period}`,
-            },
-            {
-              tenantId,
-              accountId: acc4432.id,
-              debit: 0,
-              credit: totalNet,
-              description: `Salaires nets à virer au personnel`,
-            },
-            {
-              tenantId,
-              accountId: acc4441.id,
-              debit: 0,
-              credit: totalCnss,
-              description: `Cotisations CNSS + AMO salariales`,
-            },
-            {
-              tenantId,
-              accountId: acc4452.id,
-              debit: 0,
-              credit: totalIgr,
-              description: `Retenue à la source IGR`,
-            },
-          ],
+          create: calculations.map(({ employee, calc }) => ({
+            tenantId,
+            employeeId: employee.id,
+            period,
+            grossSalary: new Prisma.Decimal(dec(calc.grossSalary).toFixed(6)),
+            cnssDeduction: new Prisma.Decimal(dec(calc.cnssDeduction).toFixed(6)),
+            amoDeduction: new Prisma.Decimal(dec(calc.amoDeduction).toFixed(6)),
+            fraisPro: new Prisma.Decimal(dec(calc.fraisPro).toFixed(6)),
+            netTaxable: new Prisma.Decimal(dec(calc.netTaxable).toFixed(6)),
+            igrDeduction: new Prisma.Decimal(dec(calc.igrDeduction).toFixed(6)),
+            netSalary: new Prisma.Decimal(dec(calc.netSalary).toFixed(6)),
+            status: "Generated",
+          })),
         },
       },
     });
 
-    return payrollRun;
+    // The entry balances by construction: gross = net + social + tax.
+    const residual = totalGross.minus(totalNet).minus(totalCnss).minus(totalIgr);
+    if (!residual.isZero()) {
+      throw domainError(
+        "UNBALANCED_ENTRY",
+        `Écart de paie de ${residual.toFixed(2)}: brut ≠ net + charges + IR`,
+        { residual: residual.toFixed(2) }
+      );
+    }
+
+    await postEntry(tx, {
+      tenantId,
+      date: runDate,
+      description: `Paie ${period}`,
+      journalCode: "OD",
+      sourceType: "PayrollRun",
+      sourceId: run.id,
+      lines: [
+        { accountCode: "6171", debit: totalGross, description: `Salaires bruts ${period}` },
+        { accountCode: "4432", credit: totalNet, description: `Net à payer ${period}` },
+        ...(totalCnss.isZero()
+          ? []
+          : [{ accountCode: "4441", credit: totalCnss, description: `CNSS / AMO ${period}` }]),
+        ...(totalIgr.isZero()
+          ? []
+          : [{ accountCode: "4452", credit: totalIgr, description: `IR retenu ${period}` }]),
+      ],
+    });
+
+    await audit(tx, {
+      tenantId,
+      entityType: "PayrollRun",
+      entityId: run.id,
+      action: "POST",
+      diff: { period, employees: employees.length, gross: totalGross.toFixed(2) },
+    });
+
+    return serialize(
+      await tx.payrollRun.findUniqueOrThrow({
+        where: { id: run.id },
+        include: { payslips: { include: { employee: true } } },
+      })
+    );
   });
 }

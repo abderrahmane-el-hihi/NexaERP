@@ -10,11 +10,12 @@ import { DocumentTextIcon, ArrowLeftIcon, DocumentCheckIcon } from "@heroicons/r
 import Link from "next/link";
 import { DevisLineEditor, type DevisLine } from "@/modules/sales/components/DevisLineEditor";
 import { createDevis } from "@/modules/sales/services/devis.service";
+import type { CompanyView, OpportunityView, ProductView } from "@/shared/view-types";
 
 interface NewDevisPageProps {
-  companies: any[];
-  opportunities: any[];
-  products: any[];
+  companies: CompanyView[];
+  opportunities: OpportunityView[];
+  products: ProductView[];
 }
 
 export default function NewDevisPage({ companies, opportunities, products }: NewDevisPageProps) {
@@ -50,9 +51,6 @@ export default function NewDevisPage({ companies, opportunities, products }: New
         opportunityId: form.opportunityId === "__none__" ? undefined : form.opportunityId,
         validUntil: form.validUntil ? new Date(form.validUntil) : undefined,
         notes: form.notes || undefined,
-        subtotal,
-        tvaAmount: totalTVA,
-        total: subtotal + totalTVA,
       }, lines.map(({ id, ...line }) => line));
       
       router.push("/dashboard/sales/devis");

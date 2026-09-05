@@ -60,7 +60,7 @@ export default async function SupplierBillsPage() {
               {bills.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                    No supplier bills recorded yet. Create a Purchase Order and click "Generate Bill" after receiving goods.
+                    No supplier bills recorded yet. Create a Purchase Order and click &quot;Generate Bill&quot; after receiving goods.
                   </td>
                 </tr>
               ) : (

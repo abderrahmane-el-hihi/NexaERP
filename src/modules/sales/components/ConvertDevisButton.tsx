@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { convertDevisToOrder } from "@/modules/sales/services/order.service";
 import { useRouter } from "next/navigation";
+import { messageOf } from "@/shared/errors";
 
 export function ConvertDevisButton({ devisId }: { devisId: string }) {
   const router = useRouter();
@@ -14,8 +15,8 @@ export function ConvertDevisButton({ devisId }: { devisId: string }) {
       await convertDevisToOrder(devisId);
       alert("Order created successfully!");
       router.push("/dashboard/sales/orders");
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (err: unknown) {
+      alert("Error: " + messageOf(err));
     }
   }
 

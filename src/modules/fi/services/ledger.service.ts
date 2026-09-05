@@ -1,11 +1,11 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
 
 export async function getAccounts() {
   const tenantId = await getTenantId();
-  return await prisma.account.findMany({
+  return await scopedPrisma(tenantId).account.findMany({
     where: { tenantId },
     orderBy: { code: "asc" },
   });
@@ -15,7 +15,7 @@ export async function createAccount(
   data: { code: string; name: string; type: string; description?: string }
 ) {
   const tenantId = await getTenantId();
-  return await prisma.account.create({
+  return await scopedPrisma(tenantId).account.create({
     data: {
       tenantId,
       ...data,
@@ -25,7 +25,7 @@ export async function createAccount(
 
 export async function getJournalEntries() {
   const tenantId = await getTenantId();
-  return await prisma.journalEntry.findMany({
+  return await scopedPrisma(tenantId).journalEntry.findMany({
     where: { tenantId },
     include: {
       lines: {
@@ -59,7 +59,7 @@ export async function createJournalEntry(
   // In a real scenario, use getNextSequenceNumber for JournalEntry.
   const number = `JE-${year}-${Date.now().toString().slice(-6)}`;
 
-  return await prisma.journalEntry.create({
+  return await scopedPrisma(tenantId).journalEntry.create({
     data: {
       tenantId,
       number,

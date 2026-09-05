@@ -1,4 +1,4 @@
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 
 export type NotificationType = 
   | "invoice.overdue"
@@ -35,7 +35,7 @@ export class NotificationService {
       userIdsToNotify = dto.targetUserIds;
     } else if (dto.targetAudience) {
       // Logic to resolve abstract audiences
-      const memberships = await prisma.tenantMembership.findMany({
+      const memberships = await scopedPrisma(dto.tenantId).tenantMembership.findMany({
         where: { tenantId: dto.tenantId },
       });
 
@@ -50,7 +50,7 @@ export class NotificationService {
     if (userIdsToNotify.length === 0) return;
 
     // 2. Fetch Preferences for these users
-    const preferences = await prisma.notificationPreference.findMany({
+    const preferences = await scopedPrisma(dto.tenantId).notificationPreference.findMany({
       where: {
         tenantId: dto.tenantId,
         userId: { in: userIdsToNotify },
@@ -88,7 +88,7 @@ export class NotificationService {
 
     // 4. Save In-App Notifications
     if (inAppToCreate.length > 0) {
-      await prisma.notification.createMany({
+      await scopedPrisma(dto.tenantId).notification.createMany({
         data: inAppToCreate
       });
     }
@@ -98,7 +98,7 @@ export class NotificationService {
    * Retrieves unread notifications for a user
    */
   static async getUnread(tenantId: string, userId: string) {
-    return prisma.notification.findMany({
+    return scopedPrisma(tenantId).notification.findMany({
       where: {
         tenantId,
         userId,
@@ -112,8 +112,8 @@ export class NotificationService {
   /**
    * Marks notifications as read
    */
-  static async markAsRead(notificationIds: string[]) {
-    return prisma.notification.updateMany({
+  static async markAsRead(tenantId: string, notificationIds: string[]) {
+    return scopedPrisma(tenantId).notification.updateMany({
       where: { id: { in: notificationIds } },
       data: { isRead: true }
     });

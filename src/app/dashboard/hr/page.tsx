@@ -75,7 +75,7 @@ export default async function HRPage() {
               {employees.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    No employees registered yet. Click "Add Employee" to get started.
+                    No employees registered yet. Click &quot;Add Employee&quot; to get started.
                   </td>
                 </tr>
               ) : (

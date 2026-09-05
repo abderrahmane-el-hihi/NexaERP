@@ -21,9 +21,10 @@ import {
 import { updateContact } from "../services/contact.service";
 import { PencilSquareIcon, UsersIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { ContactView } from "@/shared/view-types";
 
 interface EditContactDialogProps {
-  contact: any;
+  contact: ContactView;
   companies: Array<{ id: string; name: string }>;
 }
 

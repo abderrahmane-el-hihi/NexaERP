@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, type MotionProps } from "framer-motion";
 import { 
   CheckCircleIcon, 
   ChartBarIcon, 
@@ -14,14 +14,14 @@ import {
   BoltIcon
 } from "@heroicons/react/24/outline";
 
-const fadeInUp = {
+const fadeInUp: MotionProps = {
   initial: { opacity: 0, y: 30 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, margin: "-50px" },
   transition: { duration: 0.6 }
 };
 
-const staggerContainer = {
+const staggerContainer: MotionProps = {
   initial: { opacity: 0 },
   whileInView: { opacity: 1 },
   viewport: { once: true, margin: "-50px" },
@@ -144,14 +144,14 @@ export default function MarketingLandingPage() {
 
       {/* HOW IT WORKS (Minimal Nodes) */}
       <section id="how-it-works" className="py-24 px-6 max-w-7xl mx-auto relative border-t border-white/5">
-        <motion.div className="text-center mb-24" {...fadeInUp as any}>
+        <motion.div className="text-center mb-24" {...fadeInUp}>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">Clarity through connection</h2>
           <p className="text-lg text-gray-400 font-light max-w-2xl mx-auto">A modular architecture that breaks down data silos instantly.</p>
         </motion.div>
 
         <motion.div 
           className="grid md:grid-cols-3 gap-8 relative"
-          variants={staggerContainer}
+          {...staggerContainer}
           initial="initial"
           whileInView="whileInView"
           viewport={{ once: true, margin: "-50px" }}
@@ -179,7 +179,7 @@ export default function MarketingLandingPage() {
               icon: <ChartBarIcon className="w-8 h-8 text-white" />
             }
           ].map((item, i) => (
-            <motion.div key={i} variants={fadeInUp as any} className="relative group">
+            <motion.div key={i} {...fadeInUp} className="relative group">
               <div className="w-20 h-20 mx-auto mb-8 rounded-2xl bg-[#0a0a0a] border border-white/10 shadow-xl flex items-center justify-center relative group-hover:border-white/30 transition-colors z-10">
                 <div className="absolute inset-0 bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 {item.icon}
@@ -196,7 +196,7 @@ export default function MarketingLandingPage() {
 
       {/* CORE MODULES (Bento Grid) */}
       <section id="features" className="py-24 px-6 max-w-7xl mx-auto">
-        <motion.div className="mb-16" {...fadeInUp as any}>
+        <motion.div className="mb-16" {...fadeInUp}>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">Enterprise capabilities.<br/>Startup speed.</h2>
           <p className="text-lg text-gray-400 font-light max-w-2xl">Everything you need to run operations, engineered into a single codebase.</p>
         </motion.div>
@@ -205,7 +205,7 @@ export default function MarketingLandingPage() {
           {/* Finance (Large) */}
           <motion.div 
             className="md:col-span-2 bg-[#0a0a0a] rounded-3xl p-8 border border-white/5 hover:border-white/15 transition-colors relative overflow-hidden group"
-            variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }}
+            {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }}
           >
             <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/20 transition-colors"></div>
             <div className="relative z-10 h-full flex flex-col justify-between">
@@ -222,7 +222,7 @@ export default function MarketingLandingPage() {
           {/* Sales (Small) */}
           <motion.div 
             className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5 hover:border-white/15 transition-colors relative overflow-hidden group"
-            variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.1 }}
+            {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.1 }}
           >
             <div className="absolute bottom-0 right-0 w-48 h-48 bg-orange-500/10 rounded-full blur-2xl translate-y-1/2 translate-x-1/4 group-hover:bg-orange-500/20 transition-colors"></div>
             <div className="relative z-10 h-full flex flex-col justify-between">
@@ -239,7 +239,7 @@ export default function MarketingLandingPage() {
           {/* Inventory (Small) */}
           <motion.div 
             className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5 hover:border-white/15 transition-colors relative overflow-hidden group"
-            variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.2 }}
+            {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.2 }}
           >
              <div className="absolute top-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl -translate-y-1/4 -translate-x-1/4 group-hover:bg-emerald-500/20 transition-colors"></div>
             <div className="relative z-10 h-full flex flex-col justify-between">
@@ -256,7 +256,7 @@ export default function MarketingLandingPage() {
           {/* HR (Large) */}
           <motion.div 
             className="md:col-span-2 bg-[#0a0a0a] rounded-3xl p-8 border border-white/5 hover:border-white/15 transition-colors relative overflow-hidden group"
-            variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.3 }}
+            {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.3 }}
           >
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 group-hover:bg-blue-500/20 transition-colors"></div>
             <div className="relative z-10 h-full flex flex-col justify-between">
@@ -275,14 +275,14 @@ export default function MarketingLandingPage() {
       {/* PRICING */}
       <section id="pricing" className="py-24 px-6 relative border-t border-white/5 bg-[#050505]">
         <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div className="text-center mb-16" {...fadeInUp as any}>
+          <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">Transparent pricing</h2>
             <p className="text-lg text-gray-400 font-light">Start for free, upgrade when you need more power.</p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-center">
             {/* Starter */}
-            <motion.div className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5" variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }}>
+            <motion.div className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5" {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }}>
               <h3 className="text-xl font-bold text-white mb-2">Starter</h3>
               <p className="text-sm text-gray-500 mb-6 font-light">For small teams getting started.</p>
               <div className="text-4xl font-bold text-white mb-6">$49<span className="text-lg font-normal text-gray-500">/mo</span></div>
@@ -295,7 +295,7 @@ export default function MarketingLandingPage() {
             </motion.div>
 
             {/* Growth (Highlighted) */}
-            <motion.div className="bg-[#111111] rounded-3xl p-8 relative transform md:-translate-y-4 border border-white/20 shadow-[0_0_40px_rgba(240,110,83,0.15)]" variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.1 }}>
+            <motion.div className="bg-[#111111] rounded-3xl p-8 relative transform md:-translate-y-4 border border-white/20 shadow-[0_0_40px_rgba(240,110,83,0.15)]" {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.1 }}>
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl pointer-events-none"></div>
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-[#f06e53] to-[#fdbf50] text-black px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg">Most Popular</div>
               <h3 className="text-xl font-bold text-white mb-2">Growth</h3>
@@ -310,7 +310,7 @@ export default function MarketingLandingPage() {
             </motion.div>
 
             {/* Business */}
-            <motion.div className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5" variants={fadeInUp as any} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.2 }}>
+            <motion.div className="bg-[#0a0a0a] rounded-3xl p-8 border border-white/5" {...fadeInUp} initial="initial" whileInView="whileInView" viewport={{ once: true }} transition={{ delay: 0.2 }}>
               <h3 className="text-xl font-bold text-white mb-2">Business</h3>
               <p className="text-sm text-gray-500 mb-6 font-light">For established companies.</p>
               <div className="text-4xl font-bold text-white mb-6">$399<span className="text-lg font-normal text-gray-500">/mo</span></div>

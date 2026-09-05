@@ -1,33 +1,16 @@
-import { prisma } from "@/shared/db/prisma";
-import { getTenantId } from "@/lib/auth";
 import { notFound } from "next/navigation";
+import { getInvoice } from "@/modules/sales/services/invoice.service";
 import PrintTrigger from "./PrintTrigger"; // A small client component
 
 export default async function InvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const tenantId = await getTenantId();
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id, tenantId },
-    include: {
-      company: true,
-      tenant: true,
-    }
-  });
-
+  // Invoices carry their own lines now, so the printed document is the document —
+  // no more reaching back through the sales order to the quotation to guess at content.
+  const invoice = await getInvoice(id);
   if (!invoice) return notFound();
 
-  // Fetch associated lines by navigating Invoice -> SalesOrder -> Devis
-  let lines: any[] = [];
-  if (invoice.salesOrderId) {
-    const order = await prisma.salesOrder.findUnique({
-      where: { id: invoice.salesOrderId },
-      include: { devis: { include: { lines: true } } }
-    });
-    if (order?.devis?.lines) {
-      lines = order.devis.lines;
-    }
-  }
+  const lines = invoice.lines ?? [];
 
   // Formatters
   const formatCurrency = (amount: number) => {
@@ -83,12 +66,12 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
               <td className="py-4 text-right font-medium text-slate-900">{formatCurrency(invoice.subtotal)}</td>
             </tr>
           ) : (
-            lines.map((line: any) => (
+            lines.map((line) => (
               <tr key={line.id} className="border-b border-slate-200">
                 <td className="py-4 text-slate-700">{line.description}</td>
                 <td className="py-4 text-center text-slate-700">{line.quantity}</td>
                 <td className="py-4 text-right text-slate-700">{formatCurrency(line.unitPrice)}</td>
-                <td className="py-4 text-right font-medium text-slate-900">{formatCurrency(line.total)}</td>
+                <td className="py-4 text-right font-medium text-slate-900">{formatCurrency(line.lineTotal)}</td>
               </tr>
             ))
           )}
@@ -103,7 +86,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
             <span>{formatCurrency(invoice.subtotal)}</span>
           </div>
           <div className="flex justify-between py-2 text-sm text-slate-600 border-b border-slate-200">
-            <span>TVA ({((invoice.tvaAmount / invoice.subtotal) * 100).toFixed(0)}%)</span>
+            <span>TVA</span>
             <span>{formatCurrency(invoice.tvaAmount)}</span>
           </div>
           <div className="flex justify-between py-4 text-lg font-bold text-slate-900">

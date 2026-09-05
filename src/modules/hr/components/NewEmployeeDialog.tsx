@@ -40,7 +40,7 @@ export function NewEmployeeDialog() {
     baseSalary: 10000,
   });
 
-  function handleChange(key: string, value: any) {
+  function handleChange(key: string, value: string | number) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 

@@ -21,9 +21,10 @@ import {
 import { updateCompany } from "../services/company.service";
 import { PencilSquareIcon, BuildingOffice2Icon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { CompanyView } from "@/shared/view-types";
 
 interface EditCompanyDialogProps {
-  company: any;
+  company: CompanyView;
 }
 
 export function EditCompanyDialog({ company }: EditCompanyDialogProps) {

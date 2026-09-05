@@ -21,9 +21,10 @@ import {
 import { updateProduct } from "../services/product.service";
 import { PencilSquareIcon, CubeIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { ProductView } from "@/shared/view-types";
 
 interface EditProductDialogProps {
-  product: any;
+  product: ProductView;
 }
 
 export function EditProductDialog({ product }: EditProductDialogProps) {

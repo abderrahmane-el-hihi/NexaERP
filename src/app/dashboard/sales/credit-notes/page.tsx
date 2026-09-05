@@ -22,7 +22,7 @@ export default async function CreditNotesPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2 text-red-950">
             <ArrowUturnLeftIcon className="h-8 w-8 text-red-600" />
-            Credit Notes (Factures d'Avoir - AV)
+            Credit Notes (Factures d&apos;Avoir - AV)
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Legal reversal documents under Moroccan tax law. Each Avoir legally cancels the client receivable and auto-reverses General Ledger revenue.
@@ -55,7 +55,7 @@ export default async function CreditNotesPage() {
               {creditNotes.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                    No credit notes issued yet. Go to Invoices and click "Issue Avoir" on a finalized invoice.
+                    No credit notes issued yet. Go to Invoices and click &quot;Issue Avoir&quot; on a finalized invoice.
                   </td>
                 </tr>
               ) : (

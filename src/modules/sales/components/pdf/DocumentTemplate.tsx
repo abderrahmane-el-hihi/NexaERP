@@ -185,7 +185,7 @@ export const DocumentTemplate = ({ data }: { data: DocumentData }) => {
             <Text style={styles.title}>{data.type === 'DEVIS' ? 'DEVIS' : 'FACTURE'}</Text>
             <Text style={{ fontSize: 12, marginBottom: 5 }}>N° {data.number}</Text>
             <Text>Date: {formatDate(data.date)}</Text>
-            {data.validUntil && <Text>Valide jusqu'au: {formatDate(data.validUntil)}</Text>}
+            {data.validUntil && <Text>Valide jusqu&apos;au: {formatDate(data.validUntil)}</Text>}
           </View>
         </View>
 

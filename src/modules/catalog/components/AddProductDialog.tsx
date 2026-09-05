@@ -40,7 +40,7 @@ export function AddProductDialog() {
     trackStock: true,
   });
 
-  function handleChange(key: string, value: any) {
+  function handleChange(key: string, value: string | number | boolean) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 

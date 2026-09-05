@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { prisma } from "@/shared/db/prisma";
+import { withPlatformBypass } from "@/shared/db/prisma";
 import { createClient } from "@/utils/supabase/server";
 
 const ACTIVE_TENANT_COOKIE = "nexa_active_tenant";
@@ -23,21 +23,20 @@ export async function getUserTenants() {
   }
 
   // Fetch only the tenants the current user is a member of
-  const memberships = await prisma.tenantMembership.findMany({
-    where: { userId: user.id },
-    include: {
-      tenant: {
-        select: {
-          id: true,
-          name: true,
-          ICE: true,
-          city: true,
-          createdAt: true,
-        }
-      }
-    },
-    orderBy: { createdAt: "asc" }
-  });
+  // Resolving which tenants a user belongs to is a platform operation: it necessarily
+  // spans tenants and runs before any tenant context exists. It is scoped by userId,
+  // which is the only safe way to cross that boundary.
+  const memberships = await withPlatformBypass((tx) =>
+    tx.tenantMembership.findMany({
+      where: { userId: user.id },
+      include: {
+        tenant: {
+          select: { id: true, name: true, ICE: true, city: true, createdAt: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    })
+  );
 
   const tenants = memberships.map(m => m.tenant).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   

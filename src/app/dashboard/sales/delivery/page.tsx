@@ -45,7 +45,7 @@ export default async function DeliveryNotesPage() {
               {notes.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    No delivery notes generated yet. Go to Sales Orders and click "Issue Delivery (BL)".
+                    No delivery notes generated yet. Go to Sales Orders and click &quot;Issue Delivery (BL)&quot;.
                   </td>
                 </tr>
               ) : (

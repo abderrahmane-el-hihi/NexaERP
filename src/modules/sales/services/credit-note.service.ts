@@ -1,52 +1,111 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
-import { getNextSequenceNumber } from "./sequence.service";
+import { Prisma } from "@/generated/prisma/client";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { dec, serialize, sum } from "@/shared/money";
+import { domainError } from "@/shared/errors";
+import { nextNumber } from "@/modules/platform/services/sequence.service";
+import { audit } from "@/modules/platform/services/audit.service";
+import { postEntry } from "@/modules/finance/services/posting.service";
+import { computeDocumentTotals } from "@/modules/finance/services/tax.service";
+import { applyMovement } from "@/modules/inv/services/stock-ledger.service";
+
+/**
+ * Credit notes (avoirs) — the only legal way to correct a posted invoice.
+ *
+ * A partial credit is supported by passing the quantities to credit. Returned goods
+ * re-enter stock through the stock ledger so they are valued at cost rather than
+ * silently appearing.
+ */
 
 export async function getCreditNotes() {
   const tenantId = await getTenantId();
-  return await prisma.creditNote.findMany({
-    where: { tenantId },
-    include: {
-      company: true,
-      invoice: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.creditNote.findMany({
+      where: { tenantId },
+      include: { company: true, invoice: true, lines: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  );
+  return serialize(rows);
 }
 
-/**
- * Generates an immutable Credit Note (Facture d'Avoir) linked to a finalized invoice.
- * Reverses AR and Revenue by posting a balancing General Ledger Entry:
- * Debit 7111 (Ventes de marchandises) = Subtotal HT
- * Debit 4455 (État TVA facturée) = TVA Amount
- * Credit 3421 (Clients) = Total TTC
- * If restock is true, increments warehouse inventory via StockMovement (IN).
- */
-export async function createCreditNoteFromInvoice(data: {
+export interface CreditNoteInput {
   invoiceId: string;
   reason: string;
   restockGoods?: boolean;
-}) {
+  warehouseId?: string;
+  /** Optional partial credit: invoice line id -> quantity to credit. Defaults to all. */
+  quantities?: Record<string, number | string>;
+}
+
+export async function createCreditNoteFromInvoice(data: CreditNoteInput) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
-  const number = await getNextSequenceNumber(tenantId, "CreditNote", year);
+  if (!data.reason?.trim()) {
+    throw domainError("VALIDATION_FAILED", "Un motif est obligatoire pour établir un avoir");
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const invoice = await tx.invoice.findUnique({
+  return withTenant(tenantId, async (tx) => {
+    const invoice = await tx.invoice.findFirst({
       where: { id: data.invoiceId, tenantId },
-      include: {
-        company: true,
-        salesOrder: {
-          include: {
-            devis: { include: { lines: true } },
-          },
-        },
-      },
+      include: { company: true, lines: { orderBy: { position: "asc" } } },
     });
+    if (!invoice) throw domainError("NOT_FOUND", "Facture introuvable");
+    if (!["Posted", "Paid"].includes(invoice.status)) {
+      throw domainError(
+        "INVALID_STATE_TRANSITION",
+        "Seule une facture comptabilisée peut faire l'objet d'un avoir"
+      );
+    }
 
-    if (!invoice) throw new Error("Invoice not found");
+    // Never credit more than what remains uncredited on each line.
+    const previous = await tx.creditNoteLine.findMany({
+      where: { creditNote: { invoiceId: invoice.id, status: "Posted" } },
+      select: { productId: true, description: true, quantity: true },
+    });
+    const alreadyCredited = new Map<string, ReturnType<typeof dec>>();
+    for (const p of previous) {
+      const key = `${p.productId ?? ""}|${p.description}`;
+      alreadyCredited.set(key, (alreadyCredited.get(key) ?? dec(0)).plus(dec(p.quantity)));
+    }
+
+    const creditLines = invoice.lines
+      .map((line, index) => {
+        const key = `${line.productId ?? ""}|${line.description}`;
+        const credited = alreadyCredited.get(key) ?? dec(0);
+        const invoiced = dec(line.quantity);
+        const requested =
+          data.quantities?.[line.id] !== undefined
+            ? dec(data.quantities[line.id])
+            : invoiced.minus(credited);
+        const creditable = invoiced.minus(credited);
+
+        if (requested.greaterThan(creditable)) {
+          throw domainError(
+            "OVER_ALLOCATION",
+            `Quantité à créditer (${requested.toFixed(3)}) supérieure au restant sur "${line.description}" (${creditable.toFixed(3)})`
+          );
+        }
+        return { line, quantity: requested, index };
+      })
+      .filter((x) => x.quantity.greaterThan(0));
+
+    if (creditLines.length === 0) {
+      throw domainError("VALIDATION_FAILED", "Rien à créditer sur cette facture");
+    }
+
+    const totals = computeDocumentTotals(
+      creditLines.map(({ line, quantity }) => ({
+        quantity,
+        unitPrice: line.unitPrice,
+        discountPercent: line.discountPercent,
+        tvaRate: line.tvaRate,
+      }))
+    );
+
+    const number = await nextNumber(tx, tenantId, "CreditNote");
 
     const creditNote = await tx.creditNote.create({
       data: {
@@ -54,110 +113,143 @@ export async function createCreditNoteFromInvoice(data: {
         number,
         invoiceId: invoice.id,
         companyId: invoice.companyId,
-        reason: data.reason || "Retour de marchandise / Correction",
-        subtotal: invoice.subtotal,
-        tvaAmount: invoice.tvaAmount,
-        total: invoice.total,
-        status: "Finalized",
-      },
-    });
-
-    // Ensure Moroccan standard accounts exist
-    const [acc7111, acc4455, acc3421] = await Promise.all([
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "7111" } },
-        update: {},
-        create: { tenantId, code: "7111", name: "Ventes de marchandises", type: "Revenue" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4455" } },
-        update: {},
-        create: { tenantId, code: "4455", name: "État - TVA facturée", type: "Liability" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "3421" } },
-        update: {},
-        create: { tenantId, code: "3421", name: "Clients", type: "Asset" },
-      }),
-    ]);
-
-    // Post reversal Journal Entry to General Ledger
-    const journalNumber = await getNextSequenceNumber(tenantId, "JournalEntry", year);
-    await tx.journalEntry.create({
-      data: {
-        tenantId,
-        number: journalNumber,
-        description: `Avoir ${number} sur Facture ${invoice.number} - ${invoice.company.name}`,
-        sourceType: "CreditNote",
-        sourceId: creditNote.id,
+        reason: data.reason,
+        restock: data.restockGoods ?? false,
         status: "Posted",
+        postedAt: new Date(),
+        subtotal: new Prisma.Decimal(totals.subtotal.toFixed(6)),
+        tvaAmount: new Prisma.Decimal(totals.tvaAmount.toFixed(6)),
+        total: new Prisma.Decimal(totals.total.toFixed(6)),
         lines: {
-          create: [
-            {
+          create: creditLines.map(({ line, quantity }, position) => {
+            const lineSubtotal = quantity
+              .times(dec(line.unitPrice))
+              .times(dec(100).minus(dec(line.discountPercent)))
+              .dividedBy(100);
+            const lineTva = lineSubtotal.times(dec(line.tvaRate)).dividedBy(100);
+            return {
               tenantId,
-              accountId: acc7111.id,
-              debit: invoice.subtotal,
-              credit: 0,
-              description: `Annulation Vente HT - Avoir ${number}`,
-            },
-            {
-              tenantId,
-              accountId: acc4455.id,
-              debit: invoice.tvaAmount,
-              credit: 0,
-              description: `Régularisation TVA facturée - Avoir ${number}`,
-            },
-            {
-              tenantId,
-              accountId: acc3421.id,
-              debit: 0,
-              credit: invoice.total,
-              description: `Annulation Créance Client TTC - ${invoice.company.name}`,
-            },
-          ],
+              productId: line.productId,
+              description: line.description,
+              quantity: new Prisma.Decimal(quantity.toFixed(6)),
+              unitPrice: line.unitPrice,
+              tvaRate: line.tvaRate,
+              discountPercent: line.discountPercent,
+              lineSubtotal: new Prisma.Decimal(lineSubtotal.toFixed(6)),
+              lineTva: new Prisma.Decimal(lineTva.toFixed(6)),
+              lineTotal: new Prisma.Decimal(lineSubtotal.plus(lineTva).toFixed(6)),
+              position,
+            };
+          }),
         },
       },
     });
 
-    // Optionally Restock Inventory
-    if (data.restockGoods && invoice.salesOrder?.devis?.lines) {
-      const targetWarehouse = await tx.warehouse.findFirst({ where: { tenantId } });
-      if (targetWarehouse) {
-        for (const line of invoice.salesOrder.devis.lines) {
-          await tx.stockMovement.create({
-            data: {
-              tenantId,
-              productId: line.productId,
-              warehouseId: targetWarehouse.id,
-              quantity: Math.abs(line.quantity), // Positive for IN
-              reason: "CustomerReturn",
-              sourceDocumentType: "CreditNote",
-              sourceDocumentId: creditNote.id,
-              note: `Réintégration stock Avoir ${number} (Facture ${invoice.number})`,
-            },
-          });
+    // Mirror image of the sales posting: revenue and VAT down, receivable down.
+    const entry = await postEntry(tx, {
+      tenantId,
+      date: new Date(),
+      description: `Avoir ${number} sur facture ${invoice.number} — ${invoice.company.name}`,
+      journalCode: "VTE",
+      sourceType: "CreditNote",
+      sourceId: creditNote.id,
+      lines: [
+        { accountCode: "7111", debit: totals.subtotal, description: `Annulation vente HT — ${number}` },
+        ...(totals.tvaAmount.isZero()
+          ? []
+          : [{ accountCode: "4455", debit: totals.tvaAmount, description: `Régularisation TVA — ${number}` }]),
+        {
+          accountCode: "3421",
+          companyId: invoice.companyId,
+          credit: totals.total,
+          description: `Annulation créance — ${invoice.company.name}`,
+        },
+      ],
+    });
 
-          await tx.stockLevel.upsert({
-            where: {
-              productId_warehouseId: {
-                productId: line.productId,
-                warehouseId: targetWarehouse.id,
-              },
-            },
-            update: {
-              quantity: { increment: line.quantity },
-            },
-            create: {
-              tenantId,
-              productId: line.productId,
-              warehouseId: targetWarehouse.id,
-              quantity: line.quantity,
-            },
+    await tx.creditNote.update({
+      where: { id: creditNote.id },
+      data: { journalEntryId: entry.id },
+    });
+
+    // The credit reduces what the customer still owes.
+    const newDue = dec(invoice.amountDue).minus(totals.total);
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        amountDue: new Prisma.Decimal((newDue.isNegative() ? dec(0) : newDue).toFixed(6)),
+        status: newDue.lessThanOrEqualTo(0) ? "Paid" : invoice.status,
+      },
+    });
+
+    if (data.restockGoods) {
+      const warehouse = data.warehouseId
+        ? await tx.warehouse.findFirst({ where: { id: data.warehouseId, tenantId } })
+        : await tx.warehouse.findFirst({ where: { tenantId }, orderBy: { isDefault: "desc" } });
+
+      if (warehouse) {
+        for (const { line, quantity } of creditLines) {
+          if (!line.productId) continue;
+          await applyMovement(tx, {
+            tenantId,
+            productId: line.productId,
+            warehouseId: warehouse.id,
+            quantity,
+            reason: "CustomerReturn",
+            // Returned goods come back at what they cost us, not at today's cost.
+            unitCost: await originalCostOf(tx, tenantId, invoice.id, line.productId),
+            sourceDocumentType: "CreditNote",
+            sourceDocumentId: creditNote.id,
+            note: `Retour sur avoir ${number} (facture ${invoice.number})`,
           });
         }
       }
     }
 
-    return creditNote;
+    await audit(tx, {
+      tenantId,
+      entityType: "CreditNote",
+      entityId: creditNote.id,
+      action: "POST",
+      reason: data.reason,
+      diff: { number, invoice: invoice.number, total: totals.total.toFixed(2) },
+    });
+
+    return serialize(await tx.creditNote.findUniqueOrThrow({ where: { id: creditNote.id } }));
   });
+}
+
+/** Cost at which the goods originally left, so a return does not distort margin history. */
+async function originalCostOf(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
+  tenantId: string,
+  invoiceId: string,
+  productId: string
+) {
+  const outgoing = await tx.stockMovement.findFirst({
+    where: {
+      tenantId,
+      productId,
+      reason: "SalesDelivery",
+      OR: [
+        { sourceDocumentType: "Invoice", sourceDocumentId: invoiceId },
+        { sourceDocumentType: "DeliveryNote" },
+      ],
+    },
+    orderBy: { date: "desc" },
+    select: { unitCost: true },
+  });
+  return outgoing?.unitCost ?? undefined;
+}
+
+/** Sum of credit notes issued against an invoice. */
+export async function creditedAmount(invoiceId: string) {
+  const tenantId = await getTenantId();
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.creditNote.findMany({
+      where: { tenantId, invoiceId, status: "Posted" },
+      select: { total: true },
+    })
+  );
+  return sum(rows.map((r) => r.total)).toNumber();
 }

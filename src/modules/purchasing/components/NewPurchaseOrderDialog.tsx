@@ -21,10 +21,11 @@ import {
 import { createPurchaseOrder } from "../services/purchase-order.service";
 import { PlusIcon, TrashIcon, ShoppingCartIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { CompanyView, ProductView } from "@/shared/view-types";
 
 interface NewPurchaseOrderDialogProps {
-  companies: any[];
-  products: any[];
+  companies: CompanyView[];
+  products: ProductView[];
 }
 
 export function NewPurchaseOrderDialog({
@@ -59,13 +60,13 @@ export function NewPurchaseOrderDialog({
     ]);
   }
 
-  function updateLine(index: number, field: string, value: any) {
+  function updateLine(index: number, field: string, value: string | number) {
     const updated = [...lines];
     if (field === "productId") {
       const selected = products.find((p) => p.id === value);
       updated[index] = {
         ...updated[index],
-        productId: value,
+        productId: String(value),
         description: selected?.name || updated[index].description,
         unitPrice: selected?.purchasePrice || updated[index].unitPrice,
         tvaRate: selected?.tvaRate || 20,

@@ -1,4 +1,4 @@
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 import { FeatureKey, getFeaturesForPlan } from "../config/features.config";
 
 export class FeatureNotEnabledError extends Error {
@@ -21,7 +21,7 @@ export class FeatureGuardService {
    * Throws FeatureNotEnabledError if the feature is absent.
    */
   static async requireFeature(tenantId: string, featureKey: FeatureKey): Promise<void> {
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await scopedPrisma(tenantId).tenant.findUnique({
       where: { id: tenantId },
       select: { subscriptionPlan: true }
     });

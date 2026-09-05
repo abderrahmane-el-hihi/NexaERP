@@ -27,9 +27,10 @@ import {
 import { Role } from "@/generated/prisma/enums";
 import { UsersIcon, UserPlusIcon, ShieldCheckIcon, TrashIcon, EnvelopeIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface TeamManagementTabProps {
-  memberships: any[];
+  memberships: TenantSettingsData["memberships"];
 }
 
 const ROLE_DESCRIPTIONS: Record<string, { label: string; color: string; desc: string }> = {

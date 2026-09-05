@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  // useSyncExternalStore reports "mounted" without setting state inside an effect,
+  // which is what react-hooks/set-state-in-effect is warning about.
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   if (!mounted) return <div className="w-9 h-9" />; // Placeholder to avoid hydration mismatch
 

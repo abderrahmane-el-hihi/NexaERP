@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { MODULES, type ModuleCode } from "@/shared/modules/module-config";
 import { updateModuleToggles } from "../services/tenant.service";
 import { RectangleStackIcon, CheckIcon, ArrowTrendingUpIcon, ShoppingCartIcon, TruckIcon, CubeIcon, ChartBarIcon, DocumentCheckIcon, PaperClipIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface ModuleTogglesTabProps {
-  tenant: any;
+  tenant: TenantSettingsData;
 }
 
 const MODULE_ICONS: Record<ModuleCode, React.ElementType> = {

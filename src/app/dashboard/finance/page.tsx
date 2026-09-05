@@ -80,7 +80,7 @@ export default async function FinancePage() {
                     <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No open balances</td>
                   </tr>
                 ) : (
-                  receivables.map((r: any, idx: number) => (
+                  receivables.map((r, idx) => (
                     <tr key={idx} className="hover:bg-muted/30">
                       <td className="px-4 py-3 font-medium truncate max-w-[120px]">{r.companyName}</td>
                       <td className="px-4 py-3 text-right">{r.current > 0 ? r.current.toLocaleString('fr-MA') : '-'}</td>
