@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import { prisma } from '@/shared/db/prisma'
+import { withPlatformBypass } from '@/shared/db/prisma'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -44,15 +44,20 @@ export async function signup(formData: FormData) {
   }
 
   // Provision the User record in Prisma
-  if (authData.user) {
+  const createdUser = authData.user
+  if (createdUser) {
     try {
-      await prisma.user.create({
-        data: {
-          id: authData.user.id,
-          email: data.email,
-          status: 'active'
-        }
-      });
+      // Creating the User row happens before any tenant exists, so it is a
+      // platform-level write by definition.
+      await withPlatformBypass((tx) =>
+        tx.user.create({
+          data: {
+            id: createdUser.id,
+            email: data.email,
+            status: 'active'
+          }
+        })
+      );
     } catch (e) {
       console.error('Error provisioning user:', e);
       // Clean up supabase user if we failed to provision

@@ -1,117 +1,133 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
-import { getNextSequenceNumber } from "./sequence.service";
+import { Prisma } from "@/generated/prisma/client";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { dec, serialize } from "@/shared/money";
+import { domainError } from "@/shared/errors";
+import { nextNumber } from "@/modules/platform/services/sequence.service";
+import { audit } from "@/modules/platform/services/audit.service";
+import { applyMovement } from "@/modules/inv/services/stock-ledger.service";
+
+/**
+ * Delivery notes (bons de livraison).
+ *
+ * Stock leaves through `applyMovement` only. The previous version wrote StockMovement
+ * and StockLevel by hand with a read-then-write update, which both lost concurrent
+ * updates and left the movement unvalued, so cost of sales was never booked.
+ */
 
 export async function getDeliveryNotes() {
   const tenantId = await getTenantId();
-  return await prisma.deliveryNote.findMany({
-    where: { tenantId },
-    include: {
-      salesOrder: {
-        include: {
-          company: true,
-          devis: { include: { lines: { include: { product: true } } } },
-        },
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.deliveryNote.findMany({
+      where: { tenantId },
+      include: {
+        warehouse: true,
+        lines: { include: { product: true } },
+        salesOrder: { include: { company: true, lines: { include: { product: true } } } },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  );
+  return serialize(rows);
 }
 
-/**
- * Creates a Delivery Note (Bon de Livraison) from a Sales Order
- * Automatically appends StockMovement (OUT) to deduct physical warehouse stock.
- */
 export async function createDeliveryNoteFromOrder(salesOrderId: string, warehouseId?: string) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
-  const number = await getNextSequenceNumber(tenantId, "DeliveryNote", year);
 
-  return await prisma.$transaction(async (tx) => {
-    const order = await tx.salesOrder.findUnique({
+  return withTenant(tenantId, async (tx) => {
+    const order = await tx.salesOrder.findFirst({
       where: { id: salesOrderId, tenantId },
-      include: {
-        devis: { include: { lines: true } },
-        company: true,
-      },
+      include: { lines: true, company: true },
     });
-
-    if (!order) throw new Error("Sales Order not found");
-
-    // Target default warehouse
-    let targetWarehouse = warehouseId
-      ? await tx.warehouse.findUnique({ where: { id: warehouseId, tenantId } })
-      : await tx.warehouse.findFirst({ where: { tenantId } });
-
-    if (!targetWarehouse) {
-      targetWarehouse = await tx.warehouse.create({
-        data: {
-          tenantId,
-          name: "Entrepôt Principal",
-          isDefault: true,
-          address: "Siège Social, Casablanca",
-        },
-      });
+    if (!order) throw domainError("NOT_FOUND", "Commande introuvable");
+    if (order.status === "Cancelled") {
+      throw domainError("INVALID_STATE_TRANSITION", "Commande annulée");
     }
+    if (order.lines.length === 0) {
+      throw domainError("VALIDATION_FAILED", "Commande sans ligne: rien à livrer");
+    }
+
+    const warehouse = warehouseId
+      ? await tx.warehouse.findFirst({ where: { id: warehouseId, tenantId } })
+      : await tx.warehouse.findFirst({ where: { tenantId }, orderBy: { isDefault: "desc" } });
+
+    if (!warehouse) {
+      throw domainError(
+        "VALIDATION_FAILED",
+        "Aucun entrepôt configuré. Créez un entrepôt avant de livrer."
+      );
+    }
+
+    // Only what is still owed on each line.
+    const pending = order.lines
+      .map((l) => ({ line: l, remaining: dec(l.quantity).minus(dec(l.deliveredQty)) }))
+      .filter((x) => x.remaining.greaterThan(0));
+
+    if (pending.length === 0) {
+      throw domainError("INVALID_STATE_TRANSITION", "Commande déjà entièrement livrée");
+    }
+
+    const number = await nextNumber(tx, tenantId, "DeliveryNote");
 
     const bl = await tx.deliveryNote.create({
       data: {
         tenantId,
         number,
         salesOrderId: order.id,
-        warehouseId: targetWarehouse.id,
+        warehouseId: warehouse.id,
         status: "Delivered",
+        lines: {
+          create: pending.map(({ line, remaining }, index) => ({
+            tenantId,
+            salesOrderLineId: line.id,
+            productId: line.productId,
+            description: line.description,
+            quantity: new Prisma.Decimal(remaining.toFixed(6)),
+            position: index,
+          })),
+        },
       },
     });
 
-    // Deduct physical inventory for each product line
-    if (order.devis?.lines) {
-      for (const line of order.devis.lines) {
-        // Log StockMovement OUT (negative quantity)
-        await tx.stockMovement.create({
-          data: {
-            tenantId,
-            productId: line.productId,
-            warehouseId: targetWarehouse.id,
-            quantity: -Math.abs(line.quantity), // Negative for OUT
-            reason: "SalesDelivery",
-            sourceDocumentType: "DeliveryNote",
-            sourceDocumentId: bl.id,
-            note: `Livraison Commande ${order.number} - BL ${number} (${order.company.name})`,
-          },
-        });
+    for (const { line, remaining } of pending) {
+      await applyMovement(tx, {
+        tenantId,
+        productId: line.productId,
+        warehouseId: warehouse.id,
+        quantity: remaining.negated(),
+        reason: "SalesDelivery",
+        sourceDocumentType: "DeliveryNote",
+        sourceDocumentId: bl.id,
+        note: `Livraison ${number} — commande ${order.number} (${order.company.name})`,
+      });
 
-        // Decrement StockLevel
-        await tx.stockLevel.upsert({
-          where: {
-            productId_warehouseId: {
-              productId: line.productId,
-              warehouseId: targetWarehouse.id,
-            },
-          },
-          update: {
-            quantity: {
-              decrement: line.quantity,
-            },
-          },
-          create: {
-            tenantId,
-            productId: line.productId,
-            warehouseId: targetWarehouse.id,
-            quantity: -line.quantity,
-          },
-        });
-      }
+      await tx.salesOrderLine.update({
+        where: { id: line.id },
+        data: { deliveredQty: new Prisma.Decimal(dec(line.quantity).toFixed(6)) },
+      });
     }
 
-    // Update SalesOrder status
+    const refreshed = await tx.salesOrderLine.findMany({ where: { salesOrderId: order.id } });
+    const fullyDelivered = refreshed.every((l) =>
+      dec(l.deliveredQty).greaterThanOrEqualTo(dec(l.quantity))
+    );
+
     await tx.salesOrder.update({
-      where: { id: salesOrderId },
-      data: { status: "Delivered" },
+      where: { id: order.id },
+      data: { status: fullyDelivered ? "Delivered" : "PartiallyDelivered" },
     });
 
-    return bl;
+    await audit(tx, {
+      tenantId,
+      entityType: "DeliveryNote",
+      entityId: bl.id,
+      action: "POST",
+      diff: { number, salesOrder: order.number, lines: pending.length },
+    });
+
+    return serialize(await tx.deliveryNote.findUniqueOrThrow({ where: { id: bl.id } }));
   });
 }

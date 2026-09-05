@@ -1,7 +1,8 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { messageOf } from "@/shared/errors";
 
 export interface CSVImportResult {
   jobId: string;
@@ -78,7 +79,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
   }
 
   // Create Job Record
-  const job = await prisma.importJob.create({
+  const job = await scopedPrisma(tenantId).importJob.create({
     data: {
       tenantId,
       userId,
@@ -102,7 +103,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
 
   // If balanced, generate Journal Entry and Opening Balance Equity
   try {
-    const je = await prisma.journalEntry.create({
+    const je = await scopedPrisma(tenantId).journalEntry.create({
       data: {
         tenantId,
         number: `OB-${Date.now()}`,
@@ -114,7 +115,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
 
     for (const vr of validRows) {
       // Find or create account
-      let account = await prisma.account.findUnique({
+      let account = await scopedPrisma(tenantId).account.findUnique({
         where: {
           tenantId_code: {
             tenantId,
@@ -124,7 +125,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
       });
 
       if (!account) {
-        account = await prisma.account.create({
+        account = await scopedPrisma(tenantId).account.create({
           data: {
             tenantId,
             code: vr.accountCode,
@@ -134,7 +135,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
         });
       }
 
-      await prisma.journalEntryLine.create({
+      await scopedPrisma(tenantId).journalEntryLine.create({
         data: {
           tenantId,
           journalEntryId: je.id,
@@ -147,7 +148,7 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
       importedCount++;
     }
 
-    await prisma.importJob.update({
+    await scopedPrisma(tenantId).importJob.update({
       where: { id: job.id },
       data: {
         successRows: importedCount,
@@ -155,9 +156,9 @@ export async function importTrialBalanceFromCSV(csvContent: string): Promise<CSV
       }
     });
 
-  } catch (err: any) {
-    errors.push(`Database Error: ${err.message}`);
-    await prisma.importJob.update({
+  } catch (err: unknown) {
+    errors.push(`Database Error: ${messageOf(err)}`);
+    await scopedPrisma(tenantId).importJob.update({
       where: { id: job.id },
       data: { status: "Failed", errorLog: errors }
     });
@@ -180,7 +181,7 @@ export async function importProductsFromCSV(csvContent: string): Promise<CSVImpo
   const errors: string[] = [];
   let importedCount = 0;
 
-  const defaultWarehouse = await prisma.warehouse.findFirst({
+  const defaultWarehouse = await scopedPrisma(tenantId).warehouse.findFirst({
     where: { tenantId },
   });
 
@@ -203,7 +204,7 @@ export async function importProductsFromCSV(csvContent: string): Promise<CSVImpo
     const initialQty = parseInt(r.initialStock || r.Stock || "0", 10) || 0;
 
     try {
-      const product = await prisma.product.create({
+      const product = await scopedPrisma(tenantId).product.create({
         data: {
           tenantId,
           name,
@@ -217,7 +218,7 @@ export async function importProductsFromCSV(csvContent: string): Promise<CSVImpo
       });
 
       if (type === "good" && defaultWarehouse && initialQty > 0) {
-        await prisma.stockLevel.upsert({
+        await scopedPrisma(tenantId).stockLevel.upsert({
           where: {
             productId_warehouseId: {
               productId: product.id,
@@ -233,7 +234,7 @@ export async function importProductsFromCSV(csvContent: string): Promise<CSVImpo
           },
         });
 
-        await prisma.stockMovement.create({
+        await scopedPrisma(tenantId).stockMovement.create({
           data: {
             tenantId,
             productId: product.id,
@@ -247,12 +248,12 @@ export async function importProductsFromCSV(csvContent: string): Promise<CSVImpo
       }
 
       importedCount++;
-    } catch (err: any) {
-      errors.push(`Line ${lineNum} (${name}): ${err.message}`);
+    } catch (err: unknown) {
+      errors.push(`Line ${lineNum} (${name}): ${messageOf(err)}`);
     }
   }
 
-  const job = await prisma.importJob.create({
+  const job = await scopedPrisma(tenantId).importJob.create({
     data: {
       tenantId,
       userId,
@@ -302,7 +303,7 @@ export async function importCompaniesFromCSV(csvContent: string): Promise<CSVImp
     const city = r.city || r.City || r.Ville || "Casablanca";
 
     try {
-      const comp = await prisma.company.create({
+      const comp = await scopedPrisma(tenantId).company.create({
         data: {
           tenantId,
           name,
@@ -316,7 +317,7 @@ export async function importCompaniesFromCSV(csvContent: string): Promise<CSVImp
       });
 
       if (email || phone) {
-        await prisma.contact.create({
+        await scopedPrisma(tenantId).contact.create({
           data: {
             tenantId,
             companyId: comp.id,
@@ -329,12 +330,12 @@ export async function importCompaniesFromCSV(csvContent: string): Promise<CSVImp
       }
 
       importedCount++;
-    } catch (err: any) {
-      errors.push(`Line ${lineNum} (${name}): ${err.message}`);
+    } catch (err: unknown) {
+      errors.push(`Line ${lineNum} (${name}): ${messageOf(err)}`);
     }
   }
 
-  const job = await prisma.importJob.create({
+  const job = await scopedPrisma(tenantId).importJob.create({
     data: {
       tenantId,
       userId,

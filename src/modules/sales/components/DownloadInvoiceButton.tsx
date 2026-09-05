@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import dynamic from 'next/dynamic';
 import { DocumentTemplate } from "./pdf/DocumentTemplate";
+import type { InvoiceView } from "@/shared/view-types";
 
 // Dynamically import PDFDownloadLink to avoid SSR issues with react-pdf
 const PDFDownloadLink = dynamic(
@@ -11,7 +12,7 @@ const PDFDownloadLink = dynamic(
   { ssr: false, loading: () => <Button variant="outline" size="sm" disabled><ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Loading...</Button> }
 );
 
-export function DownloadInvoiceButton({ invoice }: { invoice: any }) {
+export function DownloadInvoiceButton({ invoice }: { invoice: InvoiceView }) {
   // Since our MVP Invoice model lacks detailed lines, we generate a summary line.
   // In a full implementation, we would map over invoice.lines.
   const summaryLine = {
@@ -27,7 +28,7 @@ export function DownloadInvoiceButton({ invoice }: { invoice: any }) {
     type: 'FACTURE' as const,
     number: invoice.number,
     date: invoice.date,
-    validUntil: invoice.dueDate,
+    validUntil: invoice.dueDate ?? undefined,
     company: invoice.company,
     tenant: invoice.tenant,
     lines: [summaryLine],

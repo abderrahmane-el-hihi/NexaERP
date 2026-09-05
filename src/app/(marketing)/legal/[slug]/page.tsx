@@ -5,8 +5,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { motion } from "framer-motion";
 import { DocumentCheckIcon, ShieldCheckIcon, ScaleIcon } from "@heroicons/react/24/outline";
+import type { ComponentType } from "react";
 
-const LEGAL_PAGES: Record<string, { title: string, updated: string, icon: any }> = {
+const LEGAL_PAGES: Record<string, { title: string, updated: string, icon: ComponentType<{ className?: string }> }> = {
   privacy: {
     title: "Privacy Policy",
     updated: "August 1, 2026",

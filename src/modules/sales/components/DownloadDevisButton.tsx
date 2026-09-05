@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import dynamic from 'next/dynamic';
 import { DocumentTemplate } from "./pdf/DocumentTemplate";
+import type { DevisView } from "@/shared/view-types";
 
 // Dynamically import PDFDownloadLink to avoid SSR issues with react-pdf
 const PDFDownloadLink = dynamic(
@@ -11,12 +12,12 @@ const PDFDownloadLink = dynamic(
   { ssr: false, loading: () => <Button variant="outline" size="sm" disabled><ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Loading...</Button> }
 );
 
-export function DownloadDevisButton({ devis }: { devis: any }) {
+export function DownloadDevisButton({ devis }: { devis: DevisView }) {
   const documentData = {
     type: 'DEVIS' as const,
     number: devis.number,
     date: devis.date,
-    validUntil: devis.validUntil,
+    validUntil: devis.validUntil ?? undefined,
     company: devis.company,
     tenant: devis.tenant,
     lines: devis.lines,

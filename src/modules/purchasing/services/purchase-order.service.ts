@@ -1,409 +1,442 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
-import { getNextSequenceNumber } from "@/modules/sales/services/sequence.service";
+import { Prisma } from "@/generated/prisma/client";
+import { withTenant, type Tx } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { dec, roundMoney, serialize } from "@/shared/money";
+import { domainError } from "@/shared/errors";
+import { nextNumber } from "@/modules/platform/services/sequence.service";
+import { audit } from "@/modules/platform/services/audit.service";
+import { postEntry } from "@/modules/finance/services/posting.service";
+import { computeDocumentTotals, computeLine } from "@/modules/finance/services/tax.service";
+import { applyMovement } from "@/modules/inv/services/stock-ledger.service";
+import { paySupplierBill as registerSupplierPayment } from "@/modules/finance/services/payment.service";
+import { matchBillAgainstReceipts } from "./three-way-match";
+
+/**
+ * Procure to pay.
+ *
+ * PO ──confirm──▶ goods receipt (stock in, 3111 / 4417)
+ *                        │
+ *                        ▼
+ *              vendor bill ──three-way match──▶ posted (4417 + TVA / 4411)
+ *                        │
+ *                        ▼
+ *                    payment (4411 / 5141)
+ *
+ * The receipt books goods received not invoiced against 4417, and the bill clears it.
+ * That intermediate account is what makes a mismatch between what arrived and what was
+ * billed visible instead of silently absorbed into the stock value.
+ */
+
+export interface POLineInput {
+  productId: string;
+  description: string;
+  quantity: number | string;
+  unitPrice: number | string;
+  tvaRate?: number | string;
+}
 
 export async function getPurchaseOrders() {
   const tenantId = await getTenantId();
-  return await prisma.purchaseOrder.findMany({
-    where: { tenantId },
-    include: {
-      company: true,
-      lines: { include: { product: true } },
-      receipts: true,
-      bills: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.purchaseOrder.findMany({
+      where: { tenantId },
+      include: {
+        company: true,
+        lines: { include: { product: true } },
+        receipts: true,
+        bills: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  );
+  return serialize(rows);
 }
 
 export async function getPurchaseOrder(id: string) {
   const tenantId = await getTenantId();
-  return await prisma.purchaseOrder.findUnique({
-    where: { id, tenantId },
-    include: {
-      company: true,
-      lines: { include: { product: true } },
-      receipts: true,
-      bills: true,
+  const row = await withTenant(tenantId, (tx) =>
+    tx.purchaseOrder.findFirst({
+      where: { id, tenantId },
+      include: {
+        company: true,
+        lines: { include: { product: true } },
+        receipts: true,
+        bills: { include: { lines: true } },
+      },
+    })
+  );
+  return serialize(row);
+}
+
+async function recalcPOTotals(tx: Tx, purchaseOrderId: string) {
+  const lines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId } });
+  const totals = computeDocumentTotals(
+    lines.map((l) => ({
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      tvaRate: l.tvaRate,
+      lineSubtotal: l.lineSubtotal,
+      lineTva: l.lineTva,
+    }))
+  );
+  await tx.purchaseOrder.update({
+    where: { id: purchaseOrderId },
+    data: {
+      subtotal: new Prisma.Decimal(totals.subtotal.toFixed(6)),
+      tvaAmount: new Prisma.Decimal(totals.tvaAmount.toFixed(6)),
+      total: new Prisma.Decimal(totals.total.toFixed(6)),
     },
   });
+  return totals;
 }
 
 export async function createPurchaseOrder(data: {
   companyId: string;
   expectedDate?: Date;
-  lines: Array<{
-    productId: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    tvaRate: number;
-  }>;
+  lines: POLineInput[];
 }) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
-  const number = await getNextSequenceNumber(tenantId, "PurchaseOrder", year);
+  if (!data.lines?.length) {
+    throw domainError("VALIDATION_FAILED", "Une commande d'achat doit comporter au moins une ligne");
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    let subtotal = 0;
-    let tvaAmount = 0;
+  return withTenant(tenantId, async (tx) => {
+    const supplier = await tx.company.findFirst({ where: { id: data.companyId, tenantId } });
+    if (!supplier) throw domainError("NOT_FOUND", "Fournisseur introuvable");
 
-    const orderLines = data.lines.map((line) => {
-      const qty = Number(line.quantity) || 1;
-      const price = Number(line.unitPrice) || 0;
-      const tvaRate = Number(line.tvaRate ?? 20);
-      const lineTotal = qty * price;
-      const lineTva = lineTotal * (tvaRate / 100);
+    const number = await nextNumber(tx, tenantId, "PurchaseOrder");
 
-      subtotal += lineTotal;
-      tvaAmount += lineTva;
-
-      return {
-        tenantId,
-        productId: line.productId,
-        description: line.description || "Article",
-        quantity: qty,
-        unitPrice: price,
-        tvaRate,
-        lineTotal,
-      };
-    });
-
-    const total = subtotal + tvaAmount;
-
-    return await tx.purchaseOrder.create({
+    const po = await tx.purchaseOrder.create({
       data: {
         tenantId,
         number,
         companyId: data.companyId,
-        expectedDate: data.expectedDate,
-        subtotal,
-        tvaAmount,
-        total,
+        expectedDate: data.expectedDate ?? null,
         status: "Draft",
         lines: {
-          create: orderLines,
+          create: data.lines.map((line, index) => {
+            const computed = computeLine({
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              tvaRate: line.tvaRate ?? 20,
+            });
+            return {
+              tenantId,
+              productId: line.productId,
+              description: line.description || "Article",
+              quantity: new Prisma.Decimal(dec(line.quantity).toFixed(6)),
+              unitPrice: new Prisma.Decimal(dec(line.unitPrice).toFixed(6)),
+              tvaRate: new Prisma.Decimal(dec(line.tvaRate ?? 20).toFixed(6)),
+              lineSubtotal: new Prisma.Decimal(computed.lineSubtotal.toFixed(6)),
+              lineTva: new Prisma.Decimal(computed.lineTva.toFixed(6)),
+              lineTotal: new Prisma.Decimal(computed.lineTotal.toFixed(6)),
+              position: index,
+            };
+          }),
         },
       },
-      include: {
-        company: true,
-        lines: true,
-      },
     });
+
+    await recalcPOTotals(tx, po.id);
+    await audit(tx, { tenantId, entityType: "PurchaseOrder", entityId: po.id, action: "CREATE" });
+
+    return serialize(
+      await tx.purchaseOrder.findUniqueOrThrow({
+        where: { id: po.id },
+        include: { company: true, lines: true },
+      })
+    );
   });
 }
 
 export async function confirmPurchaseOrder(id: string) {
   const tenantId = await getTenantId();
-  return await prisma.purchaseOrder.update({
-    where: { id, tenantId },
-    data: { status: "Confirmed" },
+
+  return withTenant(tenantId, async (tx) => {
+    const po = await tx.purchaseOrder.findFirst({ where: { id, tenantId } });
+    if (!po) throw domainError("NOT_FOUND", "Commande d'achat introuvable");
+    if (po.status !== "Draft" && po.status !== "Sent") {
+      throw domainError("INVALID_STATE_TRANSITION", `Commande déjà ${po.status}`);
+    }
+
+    const updated = await tx.purchaseOrder.update({
+      where: { id },
+      data: { status: "Confirmed" },
+    });
+    await audit(tx, { tenantId, entityType: "PurchaseOrder", entityId: id, action: "UPDATE" });
+    return serialize(updated);
   });
 }
 
-/**
- * 1-Click Goods Receipt (Bon de Réception) from PO
- * Creates SupplierReceipt, adds StockMovement (IN), and updates StockLevel.
- */
+/** Goods receipt. Stock enters at the PO price and 4417 records what we now owe. */
 export async function receiveGoodsFromPO(poId: string, warehouseId?: string) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
-  const receiptNumber = await getNextSequenceNumber(tenantId, "SupplierReceipt", year);
 
-  return await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({
+  return withTenant(tenantId, async (tx) => {
+    const po = await tx.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
-      include: { lines: true },
+      include: { lines: true, company: true },
     });
-
-    if (!po) throw new Error("Purchase Order not found");
-
-    // Determine target warehouse
-    let targetWarehouse = warehouseId
-      ? await tx.warehouse.findUnique({ where: { id: warehouseId, tenantId } })
-      : await tx.warehouse.findFirst({ where: { tenantId } });
-
-    if (!targetWarehouse) {
-      targetWarehouse = await tx.warehouse.create({
-        data: {
-          tenantId,
-          name: "Entrepôt Principal",
-          isDefault: true,
-          address: "Siège Social, Casablanca",
-        },
-      });
+    if (!po) throw domainError("NOT_FOUND", "Commande d'achat introuvable");
+    if (po.status === "Cancelled") {
+      throw domainError("INVALID_STATE_TRANSITION", "Commande annulée");
     }
 
-    // Create SupplierReceipt
+    const warehouse = warehouseId
+      ? await tx.warehouse.findFirst({ where: { id: warehouseId, tenantId } })
+      : await tx.warehouse.findFirst({ where: { tenantId }, orderBy: { isDefault: "desc" } });
+    if (!warehouse) {
+      throw domainError("VALIDATION_FAILED", "Aucun entrepôt configuré");
+    }
+
+    const pending = po.lines
+      .map((l) => ({ line: l, remaining: dec(l.quantity).minus(dec(l.receivedQty)) }))
+      .filter((x) => x.remaining.greaterThan(0));
+
+    if (pending.length === 0) {
+      throw domainError("INVALID_STATE_TRANSITION", "Commande déjà entièrement réceptionnée");
+    }
+
+    const number = await nextNumber(tx, tenantId, "SupplierReceipt");
+
     const receipt = await tx.supplierReceipt.create({
       data: {
         tenantId,
-        number: receiptNumber,
+        number,
         purchaseOrderId: po.id,
-        warehouseId: targetWarehouse.id,
+        warehouseId: warehouse.id,
         status: "Received",
       },
     });
 
-    // Record Stock Movement (IN) and update StockLevel for each line
-    for (const line of po.lines) {
-      // Create Stock Movement
-      await tx.stockMovement.create({
-        data: {
-          tenantId,
-          productId: line.productId,
-          warehouseId: targetWarehouse.id,
-          quantity: line.quantity, // Positive for IN
-          reason: "PurchaseReceipt",
-          sourceDocumentType: "SupplierReceipt",
-          sourceDocumentId: receipt.id,
-          note: `Réception BC ${po.number} - Bon de Réception ${receiptNumber}`,
-        },
+    for (const { line, remaining } of pending) {
+      await applyMovement(tx, {
+        tenantId,
+        productId: line.productId,
+        warehouseId: warehouse.id,
+        quantity: remaining,
+        unitCost: line.unitPrice,
+        reason: "PurchaseReceipt",
+        sourceDocumentType: "SupplierReceipt",
+        sourceDocumentId: receipt.id,
+        note: `Réception ${number} — commande ${po.number} (${po.company.name})`,
       });
 
-      // Upsert StockLevel
-      await tx.stockLevel.upsert({
-        where: {
-          productId_warehouseId: {
-            productId: line.productId,
-            warehouseId: targetWarehouse.id,
-          },
-        },
-        update: {
-          quantity: {
-            increment: line.quantity,
-          },
-        },
-        create: {
-          tenantId,
-          productId: line.productId,
-          warehouseId: targetWarehouse.id,
-          quantity: line.quantity,
-        },
+      await tx.purchaseOrderLine.update({
+        where: { id: line.id },
+        data: { receivedQty: new Prisma.Decimal(dec(line.quantity).toFixed(6)) },
       });
     }
 
-    // Update PO status to Received
-    await tx.purchaseOrder.update({
-      where: { id: poId },
-      data: { status: "Received" },
+    await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: "Received" } });
+    await audit(tx, {
+      tenantId,
+      entityType: "SupplierReceipt",
+      entityId: receipt.id,
+      action: "POST",
+      diff: { number, purchaseOrder: po.number, lines: pending.length },
     });
 
-    return receipt;
+    return serialize(await tx.supplierReceipt.findUniqueOrThrow({ where: { id: receipt.id } }));
   });
 }
 
-/**
- * 3-Way Match & Supplier Bill Generation
- * Creates SupplierBill and posts balanced Accounts Payable Journal Entry:
- * Debit 6111 (Achats de marchandises) = Subtotal HT
- * Debit 3455 (État TVA récupérable sur charges) = TVA Amount
- * Credit 4411 (Fournisseurs) = Total TTC
- */
-export async function createSupplierBillFromPO(poId: string, supplierReference?: string) {
+export async function createSupplierBillFromPO(
+  poId: string,
+  supplierReference?: string,
+  options: { acceptVariance?: boolean; varianceReason?: string } = {}
+) {
   const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
-  const billNumber = await getNextSequenceNumber(tenantId, "SupplierBill", year);
 
-  return await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({
+  return withTenant(tenantId, async (tx) => {
+    const po = await tx.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
-      include: { receipts: true, company: true },
+      include: { lines: true, company: true, receipts: true },
     });
+    if (!po) throw domainError("NOT_FOUND", "Commande d'achat introuvable");
 
-    if (!po) throw new Error("Purchase Order not found");
+    if (supplierReference) {
+      const duplicate = await tx.supplierBill.findFirst({
+        where: { tenantId, companyId: po.companyId, supplierReference },
+      });
+      if (duplicate) {
+        throw domainError(
+          "DUPLICATE_DOCUMENT",
+          `La facture fournisseur ${supplierReference} a déjà été enregistrée (${duplicate.number})`,
+          { existingId: duplicate.id }
+        );
+      }
+    }
 
-    const receipt = po.receipts[0];
+    const billable = po.lines
+      .map((l) => ({ line: l, quantity: dec(l.receivedQty).minus(dec(l.billedQty)) }))
+      .filter((x) => x.quantity.greaterThan(0));
+
+    if (billable.length === 0) {
+      throw domainError(
+        "VALIDATION_FAILED",
+        "Rien à facturer: réceptionnez la marchandise avant d'enregistrer la facture fournisseur"
+      );
+    }
+
+    const exceptions = matchBillAgainstReceipts(
+      po.lines,
+      billable.map(({ line, quantity }) => ({
+        purchaseOrderLineId: line.id,
+        description: line.description,
+        quantity,
+        unitPrice: line.unitPrice,
+      }))
+    );
+
+    if (exceptions.length > 0 && !options.acceptVariance) {
+      throw domainError(
+        "VALIDATION_FAILED",
+        `Écarts de rapprochement à trois voies: ${exceptions.map((e) => e.detail).join("; ")}`,
+        { exceptions }
+      );
+    }
+
+    const totals = computeDocumentTotals(
+      billable.map(({ line, quantity }) => ({
+        quantity,
+        unitPrice: line.unitPrice,
+        tvaRate: line.tvaRate,
+      }))
+    );
+
+    const number = await nextNumber(tx, tenantId, "SupplierBill");
+    const date = new Date();
+    const dueDate = new Date(
+      date.getTime() + (po.company.defaultPaymentTermsDays ?? 30) * 86_400_000
+    );
 
     const bill = await tx.supplierBill.create({
       data: {
         tenantId,
-        number: billNumber,
-        supplierReference: supplierReference || `INV-${po.number}`,
+        number,
+        supplierReference: supplierReference ?? null,
         companyId: po.companyId,
         purchaseOrderId: po.id,
-        supplierReceiptId: receipt ? receipt.id : null,
-        subtotal: po.subtotal,
-        tvaAmount: po.tvaAmount,
-        total: po.total,
-        amountDue: po.total,
-        amountPaid: 0,
+        supplierReceiptId: po.receipts[0]?.id ?? null,
+        date,
+        dueDate,
         status: "Posted",
-      },
-    });
-
-    // Ensure Moroccan standard accounts exist for AP
-    const [acc6111, acc3455, acc4411] = await Promise.all([
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "6111" } },
-        update: {},
-        create: {
-          tenantId,
-          code: "6111",
-          name: "Achats de marchandises",
-          type: "Expense",
-        },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "3455" } },
-        update: {},
-        create: {
-          tenantId,
-          code: "3455",
-          name: "État - TVA récupérable sur les charges",
-          type: "Asset",
-        },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4411" } },
-        update: {},
-        create: {
-          tenantId,
-          code: "4411",
-          name: "Fournisseurs",
-          type: "Liability",
-        },
-      }),
-    ]);
-
-    // Create balanced Journal Entry for Accounts Payable
-    const journalNumber = await getNextSequenceNumber(tenantId, "JournalEntry", year);
-    await tx.journalEntry.create({
-      data: {
-        tenantId,
-        number: journalNumber,
-        description: `Facture Fournisseur ${billNumber} - ${po.company.name}`,
-        sourceType: "SupplierBill",
-        sourceId: bill.id,
-        status: "Posted",
+        postedAt: date,
+        subtotal: new Prisma.Decimal(totals.subtotal.toFixed(6)),
+        tvaAmount: new Prisma.Decimal(totals.tvaAmount.toFixed(6)),
+        total: new Prisma.Decimal(totals.total.toFixed(6)),
+        amountDue: new Prisma.Decimal(totals.total.toFixed(6)),
+        taxBreakdown: totals.breakdown as never,
         lines: {
-          create: [
-            {
+          create: billable.map(({ line, quantity }, position) => {
+            const computed = computeLine({
+              quantity,
+              unitPrice: line.unitPrice,
+              tvaRate: line.tvaRate,
+            });
+            return {
               tenantId,
-              accountId: acc6111.id,
-              debit: po.subtotal,
-              credit: 0,
-              description: `Achats HT - ${po.company.name}`,
-            },
-            {
-              tenantId,
-              accountId: acc3455.id,
-              debit: po.tvaAmount,
-              credit: 0,
-              description: `TVA récupérable 20% - ${po.company.name}`,
-            },
-            {
-              tenantId,
-              accountId: acc4411.id,
-              debit: 0,
-              credit: po.total,
-              description: `Dette fournisseur TTC - ${po.company.name}`,
-            },
-          ],
+              purchaseOrderLineId: line.id,
+              productId: line.productId,
+              description: line.description,
+              quantity: new Prisma.Decimal(quantity.toFixed(6)),
+              unitPrice: line.unitPrice,
+              tvaRate: line.tvaRate,
+              lineSubtotal: new Prisma.Decimal(computed.lineSubtotal.toFixed(6)),
+              lineTva: new Prisma.Decimal(computed.lineTva.toFixed(6)),
+              lineTotal: new Prisma.Decimal(computed.lineTotal.toFixed(6)),
+              position,
+            };
+          }),
         },
       },
     });
 
-    return bill;
+    // Clear goods-received-not-invoiced, recognise deductible VAT, owe the supplier.
+    const entry = await postEntry(tx, {
+      tenantId,
+      date,
+      description: `Facture fournisseur ${number} — ${po.company.name}`,
+      journalCode: "ACH",
+      sourceType: "SupplierBill",
+      sourceId: bill.id,
+      lines: [
+        { accountCode: "4417", debit: totals.subtotal, description: `Réception facturée — ${number}` },
+        ...(totals.tvaAmount.isZero()
+          ? []
+          : [{ accountCode: "3455", debit: totals.tvaAmount, description: `TVA récupérable — ${number}` }]),
+        {
+          accountCode: "4411",
+          companyId: po.companyId,
+          credit: totals.total,
+          description: `Dette fournisseur ${po.company.name}`,
+        },
+      ],
+    });
+
+    await tx.supplierBill.update({ where: { id: bill.id }, data: { journalEntryId: entry.id } });
+
+    for (const { line, quantity } of billable) {
+      await tx.purchaseOrderLine.update({
+        where: { id: line.id },
+        data: { billedQty: new Prisma.Decimal(dec(line.billedQty).plus(quantity).toFixed(6)) },
+      });
+    }
+
+    await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: "Billed" } });
+
+    await audit(tx, {
+      tenantId,
+      entityType: "SupplierBill",
+      entityId: bill.id,
+      action: "POST",
+      reason: exceptions.length > 0 ? options.varianceReason ?? "Écart accepté" : null,
+      diff: { number, total: totals.total.toFixed(2), exceptions },
+    });
+
+    return serialize(await tx.supplierBill.findUniqueOrThrow({ where: { id: bill.id } }));
   });
 }
 
-/**
- * Retrieves all Supplier Bills for Accounts Payable
- */
 export async function getSupplierBills() {
   const tenantId = await getTenantId();
-  return await prisma.supplierBill.findMany({
-    where: { tenantId },
-    include: {
-      company: true,
-      purchaseOrder: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.supplierBill.findMany({
+      where: { tenantId },
+      include: { company: true, purchaseOrder: true, lines: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  );
+  return serialize(rows);
 }
 
 /**
- * Settles a Supplier Bill (Disbursement / Règlement Fournisseur)
- * Debit 4411 (Fournisseurs) / Credit 5141 (Banque)
+ * Settles a supplier bill. The money movement and its ledger entry are produced by the
+ * payment service, which is the only place a payment is created — the previous version
+ * adjusted amountPaid by hand and never touched the ledger, so cash and the books
+ * disagreed by construction.
  */
 export async function paySupplierBill(data: {
   billId: string;
-  amount: number;
-  paymentMethod: string;
+  amount: number | string;
+  method: string;
   reference?: string;
+  date?: Date;
 }) {
-  const tenantId = await getTenantId();
-  const year = new Date().getFullYear();
+  const amount = roundMoney(data.amount);
+  if (amount.lessThanOrEqualTo(0)) {
+    throw domainError("VALIDATION_FAILED", "Le montant du règlement doit être positif");
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const bill = await tx.supplierBill.findUnique({
-      where: { id: data.billId, tenantId },
-      include: { company: true },
-    });
-
-    if (!bill) throw new Error("Supplier Bill not found");
-
-    const newAmountPaid = bill.amountPaid + data.amount;
-    const newAmountDue = Math.max(0, bill.total - newAmountPaid);
-    const newStatus = newAmountDue <= 0.01 ? "Paid" : "Posted";
-
-    const updatedBill = await tx.supplierBill.update({
-      where: { id: data.billId },
-      data: {
-        amountPaid: newAmountPaid,
-        amountDue: newAmountDue,
-        status: newStatus,
-      },
-    });
-
-    // Ensure Bank account 5141 and 4411 exist
-    const [acc4411, acc5141] = await Promise.all([
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "4411" } },
-        update: {},
-        create: { tenantId, code: "4411", name: "Fournisseurs", type: "Liability" },
-      }),
-      tx.account.upsert({
-        where: { tenantId_code: { tenantId, code: "5141" } },
-        update: {},
-        create: { tenantId, code: "5141", name: "Banque", type: "Asset" },
-      }),
-    ]);
-
-    // Post payment journal entry
-    const journalNumber = await getNextSequenceNumber(tenantId, "JournalEntry", year);
-    await tx.journalEntry.create({
-      data: {
-        tenantId,
-        number: journalNumber,
-        description: `Paiement Facture Fournisseur ${bill.number} - ${bill.company.name} (${data.paymentMethod})`,
-        sourceType: "Payment",
-        sourceId: bill.id,
-        status: "Posted",
-        lines: {
-          create: [
-            {
-              tenantId,
-              accountId: acc4411.id,
-              debit: data.amount,
-              credit: 0,
-              description: `Règlement dette fournisseur - ${bill.company.name}`,
-            },
-            {
-              tenantId,
-              accountId: acc5141.id,
-              debit: 0,
-              credit: data.amount,
-              description: `Sortie de trésorerie banque - ${data.paymentMethod}`,
-            },
-          ],
-        },
-      },
-    });
-
-    return updatedBill;
+  return registerSupplierPayment(data.billId, {
+    amount: amount.toFixed(2),
+    method: data.method,
+    reference: data.reference,
+    date: data.date,
   });
 }

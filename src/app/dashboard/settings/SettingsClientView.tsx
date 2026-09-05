@@ -9,10 +9,12 @@ import { TeamManagementTab } from "@/modules/tenant/components/TeamManagementTab
 import { ComplianceDGITab } from "@/modules/tenant/components/ComplianceDGITab";
 import { DataPrivacyTab } from "@/modules/tenant/components/DataPrivacyTab";
 import { BuildingOffice2Icon, DocumentTextIcon, CreditCardIcon, RectangleStackIcon, UsersIcon, DocumentCheckIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import type { getTenantSettings } from "@/modules/tenant/services/tenant.service";
+import type { getTenantPlanDetails } from "@/modules/billing/services/plan.service";
 
 interface SettingsClientViewProps {
-  tenant: any;
-  planData: any;
+  tenant: Awaited<ReturnType<typeof getTenantSettings>>;
+  planData: Awaited<ReturnType<typeof getTenantPlanDetails>>;
 }
 
 const TABS = [

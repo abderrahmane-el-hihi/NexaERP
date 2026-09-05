@@ -9,9 +9,10 @@ import {
 } from "../services/purchase-order.service";
 import { CheckCircleIcon, PlusCircleIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { PurchaseOrderView } from "@/shared/view-types";
 
 interface PurchaseOrderActionsProps {
-  order: any;
+  order: PurchaseOrderView;
 }
 
 export function PurchaseOrderActions({ order }: PurchaseOrderActionsProps) {

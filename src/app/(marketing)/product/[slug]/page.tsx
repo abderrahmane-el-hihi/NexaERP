@@ -5,8 +5,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { motion } from "framer-motion";
 import { BanknotesIcon, CubeIcon, CreditCardIcon, UserGroupIcon, CheckIcon } from "@heroicons/react/24/outline";
+import type { ComponentType } from "react";
 
-const PRODUCTS: Record<string, { title: string, subtitle: string, icon: any, features: string[], color: string, glow: string }> = {
+const PRODUCTS: Record<string, { title: string, subtitle: string, icon: ComponentType<{ className?: string }>, features: string[], color: string, glow: string }> = {
   finance: {
     title: "Financial Accounting",
     subtitle: "Keep your books flawless automatically.",

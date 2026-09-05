@@ -1,70 +1,61 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { serialize } from "@/shared/money";
+import { domainError } from "@/shared/errors";
+import { applyMovement } from "./stock-ledger.service";
 
 export async function getStockAdjustmentPrerequisites() {
   const tenantId = await getTenantId();
-
-  const [products, warehouses] = await Promise.all([
-    prisma.product.findMany({
-      where: { tenantId, type: "good" },
-      orderBy: { name: "asc" },
-    }),
-    prisma.warehouse.findMany({
-      where: { tenantId },
-      orderBy: { isDefault: "desc" },
-    }),
-  ]);
-
-  return { products, warehouses };
+  const data = await withTenant(tenantId, async (tx) => {
+    const [products, warehouses] = await Promise.all([
+      tx.product.findMany({
+        where: { tenantId, type: "good", isActive: true },
+        orderBy: { name: "asc" },
+      }),
+      tx.warehouse.findMany({ where: { tenantId }, orderBy: { isDefault: "desc" } }),
+    ]);
+    return { products, warehouses };
+  });
+  return serialize(data);
 }
 
+/**
+ * Manual stock adjustment. It goes through the stock ledger like everything else, so
+ * the variance is valued and posted to the gain/loss accounts rather than appearing
+ * as quantity out of nowhere.
+ */
 export async function recordStockAdjustment(data: {
   productId: string;
   warehouseId: string;
   type: "IN" | "OUT";
-  quantity: number;
+  quantity: number | string;
   notes?: string;
 }) {
   const tenantId = await getTenantId();
-  const qty = Math.max(1, Math.abs(data.quantity));
+  const qty = Math.abs(Number(data.quantity));
+  if (!Number.isFinite(qty) || qty <= 0) {
+    throw domainError("VALIDATION_FAILED", "Quantité invalide");
+  }
+  if (!data.notes?.trim()) {
+    throw domainError(
+      "VALIDATION_FAILED",
+      "Un ajustement manuel exige une justification (piste d'audit)"
+    );
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    // 1. Create StockMovement
-    const movement = await tx.stockMovement.create({
-      data: {
-        tenantId,
-        productId: data.productId,
-        warehouseId: data.warehouseId,
-        quantity: data.type === "IN" ? qty : -qty,
-        reason: "ManualAdjustment",
-        note: data.notes || `Manual Stock ${data.type} Adjustment`,
-        sourceDocumentType: "ManualAdjustment",
-      },
-    });
+  const movement = await withTenant(tenantId, (tx) =>
+    applyMovement(tx, {
+      tenantId,
+      productId: data.productId,
+      warehouseId: data.warehouseId,
+      quantity: data.type === "IN" ? qty : -qty,
+      reason: "ManualAdjustment",
+      note: data.notes,
+      sourceDocumentType: "ManualAdjustment",
+    })
+  );
 
-    // 2. Upsert StockLevel
-    const delta = data.type === "IN" ? qty : -qty;
-
-    await tx.stockLevel.upsert({
-      where: {
-        productId_warehouseId: {
-          productId: data.productId,
-          warehouseId: data.warehouseId,
-        },
-      },
-      update: {
-        quantity: { increment: delta },
-      },
-      create: {
-        tenantId,
-        productId: data.productId,
-        warehouseId: data.warehouseId,
-        quantity: Math.max(0, delta),
-      },
-    });
-
-    return movement;
-  });
+  return serialize(movement);
 }

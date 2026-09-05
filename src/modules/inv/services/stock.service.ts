@@ -1,80 +1,62 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { serialize } from "@/shared/money";
+import { applyMovement, type MovementReason } from "./stock-ledger.service";
+
+/**
+ * Read side of inventory plus the single entry point the UI uses to move stock.
+ * All writing happens in stock-ledger.service, which is the only module allowed to
+ * touch StockMovement, ValuationLayer and StockLevel.
+ */
 
 export async function getStockLevels() {
   const tenantId = await getTenantId();
-  return await prisma.stockLevel.findMany({
-    where: { tenantId },
-    include: { product: true, warehouse: true },
-    orderBy: { product: { name: "asc" } },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.stockLevel.findMany({
+      where: { tenantId },
+      include: { product: true, warehouse: true },
+      orderBy: { product: { name: "asc" } },
+    })
+  );
+  return serialize(rows);
 }
 
 export async function getWarehouses() {
   const tenantId = await getTenantId();
-  return await prisma.warehouse.findMany({
-    where: { tenantId },
-    orderBy: { name: "asc" },
-  });
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.warehouse.findMany({ where: { tenantId }, orderBy: { name: "asc" } })
+  );
+  return serialize(rows);
 }
 
-/**
- * Core transactional method to record a stock movement.
- * Always logs the movement in the append-only ledger and updates the derived StockLevel.
- */
-export async function recordStockMovement(
-  data: {
-    productId: string;
-    warehouseId: string;
-    quantity: number;
-    reason: "SalesDelivery" | "PurchaseReceipt" | "ManualAdjustment";
-    note?: string;
-    sourceDocumentType?: string;
-    sourceDocumentId?: string;
-  }
-) {
+export async function getStockMovements(productId?: string) {
   const tenantId = await getTenantId();
-  if (data.reason === "ManualAdjustment" && !data.note) {
-    throw new Error("Manual adjustments require a note for audit purposes.");
-  }
+  const rows = await withTenant(tenantId, (tx) =>
+    tx.stockMovement.findMany({
+      where: { tenantId, ...(productId ? { productId } : {}) },
+      include: { product: true, warehouse: true },
+      orderBy: { date: "desc" },
+      take: 200,
+    })
+  );
+  return serialize(rows);
+}
 
-  return await prisma.$transaction(async (tx) => {
-    // 1. Record the movement in the ledger
-    const movement = await tx.stockMovement.create({
-      data: {
-        tenantId,
-        ...data,
-      },
-    });
-
-    // 2. Update or create the current StockLevel (derived cache)
-    const currentLevel = await tx.stockLevel.findUnique({
-      where: {
-        productId_warehouseId: {
-          productId: data.productId,
-          warehouseId: data.warehouseId,
-        },
-      },
-    });
-
-    if (currentLevel) {
-      await tx.stockLevel.update({
-        where: { id: currentLevel.id },
-        data: { quantity: currentLevel.quantity + data.quantity },
-      });
-    } else {
-      await tx.stockLevel.create({
-        data: {
-          tenantId,
-          productId: data.productId,
-          warehouseId: data.warehouseId,
-          quantity: data.quantity,
-        },
-      });
-    }
-
-    return movement;
-  });
+export async function recordStockMovement(data: {
+  productId: string;
+  warehouseId: string;
+  quantity: number | string;
+  reason: MovementReason;
+  note?: string;
+  unitCost?: number | string;
+  sourceDocumentType?: string;
+  sourceDocumentId?: string;
+}) {
+  const tenantId = await getTenantId();
+  const movement = await withTenant(tenantId, (tx) =>
+    applyMovement(tx, { tenantId, ...data })
+  );
+  return serialize(movement);
 }

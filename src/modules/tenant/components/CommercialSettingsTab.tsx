@@ -14,9 +14,10 @@ import {
 } from "@/components/ui/select";
 import { updateCommercialSettings } from "../services/tenant.service";
 import { ReceiptRefundIcon, CheckIcon, CalculatorIcon, ClockIcon, DocumentTextIcon, TagIcon } from "@heroicons/react/24/outline";
+import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface CommercialSettingsTabProps {
-  tenant: any;
+  tenant: TenantSettingsData;
 }
 
 export function CommercialSettingsTab({ tenant }: CommercialSettingsTabProps) {
@@ -34,7 +35,7 @@ export function CommercialSettingsTab({ tenant }: CommercialSettingsTabProps) {
     dgiWave: extra.dgiWave || "Wave3",
   });
 
-  function handleChange(key: string, value: any) {
+  function handleChange(key: string, value: string | number | boolean) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   }

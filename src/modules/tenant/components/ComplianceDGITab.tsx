@@ -3,9 +3,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DocumentCheckIcon, ShieldExclamationIcon, CheckCircleIcon, ArrowTopRightOnSquareIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface ComplianceDGITabProps {
-  tenant: any;
+  tenant: TenantSettingsData;
 }
 
 export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {

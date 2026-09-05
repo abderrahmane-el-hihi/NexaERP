@@ -1,9 +1,31 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
 import type { ModuleCode } from "@/shared/modules/module-config";
 import { Role } from "@/generated/prisma/enums";
+
+/**
+ * The settings blob stored on Tenant.enabledModules. Typed explicitly so the settings
+ * screens cannot read a field that does not exist — it used to be `any`.
+ */
+export interface TenantModuleSettings {
+  modules?: ModuleCode[] | string[];
+  tvaWave?: number;
+  defaultPaymentTerms?: string | number;
+  defaultTvaRate?: number;
+  defaultDevisValidity?: number;
+  currency?: string;
+  invoiceFooterNote?: string;
+  dgiWave?: string;
+  cnss?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  bankName?: string;
+  bankRIB?: string;
+  [key: string]: unknown;
+}
 
 export interface TenantSettingsData {
   id: string;
@@ -18,7 +40,7 @@ export interface TenantSettingsData {
   defaultCurrency: string;
   fiscalYearStart: Date | null;
   logo: string | null;
-  enabledModules: Record<string, any> | null;
+  enabledModules: TenantModuleSettings | null;
   subscriptionPlan: string | null;
   memberships: {
     id: string;
@@ -42,7 +64,7 @@ export async function getTenantSettings(): Promise<TenantSettingsData> {
   const tenantId = await getTenantId();
 
   // Ensure default demo tenant exists
-  let tenant = await prisma.tenant.findUnique({
+  let tenant = await scopedPrisma(tenantId).tenant.findUnique({
     where: { id: tenantId },
     include: {
       memberships: {
@@ -55,7 +77,7 @@ export async function getTenantSettings(): Promise<TenantSettingsData> {
   });
 
   if (!tenant) {
-    tenant = await prisma.tenant.create({
+    tenant = await scopedPrisma(tenantId).tenant.create({
       data: {
         id: tenantId,
         name: "Atlas Distribution SARL",
@@ -95,7 +117,7 @@ export async function getTenantSettings(): Promise<TenantSettingsData> {
 
   // Ensure at least one Owner membership exists for display
   if (tenant.memberships.length === 0) {
-    const defaultUser = await prisma.user.upsert({
+    const defaultUser = await scopedPrisma(tenantId).user.upsert({
       where: { id: "demo-owner" },
       update: {},
       create: {
@@ -107,7 +129,7 @@ export async function getTenantSettings(): Promise<TenantSettingsData> {
       },
     });
 
-    const membership = await prisma.tenantMembership.upsert({
+    const membership = await scopedPrisma(tenantId).tenantMembership.upsert({
       where: {
         userId_tenantId: {
           userId: defaultUser.id,
@@ -151,8 +173,8 @@ export async function updateTenantProfile(data: {
   bankRIB?: string;
 }) {
   const tenantId = await getTenantId();
-  const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  const existingModules = (existing?.enabledModules as Record<string, any>) || {};
+  const existing = await scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } });
+  const existingModules = (existing?.enabledModules as TenantModuleSettings) || {};
 
   const updatedModules = {
     ...existingModules,
@@ -164,7 +186,7 @@ export async function updateTenantProfile(data: {
     bankRIB: data.bankRIB ?? existingModules.bankRIB,
   };
 
-  return await prisma.tenant.update({
+  return await scopedPrisma(tenantId).tenant.update({
     where: { id: tenantId },
     data: {
       name: data.name,
@@ -192,8 +214,8 @@ export async function updateCommercialSettings(data: {
   dgiWave: string;
 }) {
   const tenantId = await getTenantId();
-  const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  const existingModules = (existing?.enabledModules as Record<string, any>) || {};
+  const existing = await scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } });
+  const existingModules = (existing?.enabledModules as TenantModuleSettings) || {};
 
   const updatedModules = {
     ...existingModules,
@@ -204,7 +226,7 @@ export async function updateCommercialSettings(data: {
     dgiWave: data.dgiWave,
   };
 
-  return await prisma.tenant.update({
+  return await scopedPrisma(tenantId).tenant.update({
     where: { id: tenantId },
     data: {
       defaultCurrency: data.defaultCurrency,
@@ -218,15 +240,15 @@ export async function updateCommercialSettings(data: {
  */
 export async function updateModuleToggles(modules: ModuleCode[]) {
   const tenantId = await getTenantId();
-  const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  const existingModules = (existing?.enabledModules as Record<string, any>) || {};
+  const existing = await scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } });
+  const existingModules = (existing?.enabledModules as TenantModuleSettings) || {};
 
   const updatedModules = {
     ...existingModules,
     modules,
   };
 
-  return await prisma.tenant.update({
+  return await scopedPrisma(tenantId).tenant.update({
     where: { id: tenantId },
     data: {
       enabledModules: updatedModules,
@@ -245,7 +267,7 @@ export async function inviteTeamMember(data: {
   const tenantId = await getTenantId();
 
   // Find or create user
-  const user = await prisma.user.upsert({
+  const user = await scopedPrisma(tenantId).user.upsert({
     where: { email: data.email },
     update: { name: data.name },
     create: {
@@ -258,7 +280,7 @@ export async function inviteTeamMember(data: {
   });
 
   // Create membership
-  return await prisma.tenantMembership.upsert({
+  return await scopedPrisma(tenantId).tenantMembership.upsert({
     where: {
       userId_tenantId: {
         userId: user.id,
@@ -284,7 +306,7 @@ export async function inviteTeamMember(data: {
  */
 export async function updateMemberRole(membershipId: string, role: Role) {
   const tenantId = await getTenantId();
-  return await prisma.tenantMembership.update({
+  return await scopedPrisma(tenantId).tenantMembership.update({
     where: { id: membershipId, tenantId },
     data: { role },
     include: { user: true },
@@ -296,7 +318,7 @@ export async function updateMemberRole(membershipId: string, role: Role) {
  */
 export async function removeTeamMember(membershipId: string) {
   const tenantId = await getTenantId();
-  return await prisma.tenantMembership.delete({
+  return await scopedPrisma(tenantId).tenantMembership.delete({
     where: { id: membershipId, tenantId },
   });
 }
@@ -320,17 +342,17 @@ export async function exportTenantData() {
     stockMovements,
     accounts,
   ] = await Promise.all([
-    prisma.tenant.findUnique({ where: { id: tenantId } }),
-    prisma.company.findMany({ where: { tenantId } }),
-    prisma.contact.findMany({ where: { tenantId } }),
-    prisma.opportunity.findMany({ where: { tenantId } }),
-    prisma.product.findMany({ where: { tenantId } }),
-    prisma.devis.findMany({ where: { tenantId }, include: { lines: true } }),
-    prisma.salesOrder.findMany({ where: { tenantId } }),
-    prisma.invoice.findMany({ where: { tenantId }, include: { payments: true } }),
-    prisma.stockLevel.findMany({ where: { tenantId } }),
-    prisma.stockMovement.findMany({ where: { tenantId } }),
-    prisma.account.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } }),
+    scopedPrisma(tenantId).company.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).contact.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).opportunity.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).product.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).devis.findMany({ where: { tenantId }, include: { lines: true } }),
+    scopedPrisma(tenantId).salesOrder.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).invoice.findMany({ where: { tenantId }, include: { lines: true, allocations: { include: { payment: true } } } }),
+    scopedPrisma(tenantId).stockLevel.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).stockMovement.findMany({ where: { tenantId } }),
+    scopedPrisma(tenantId).account.findMany({ where: { tenantId } }),
   ]);
 
   return {

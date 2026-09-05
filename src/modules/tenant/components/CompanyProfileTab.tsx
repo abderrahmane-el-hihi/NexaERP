@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateTenantProfile } from "../services/tenant.service";
 import { BuildingOffice2Icon, CheckIcon, BuildingLibraryIcon, ShieldCheckIcon, PhoneIcon, EnvelopeIcon, GlobeAltIcon, MapPinIcon } from "@heroicons/react/24/outline";
+import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface CompanyProfileTabProps {
-  tenant: any;
+  tenant: TenantSettingsData;
 }
 
 export function CompanyProfileTab({ tenant }: CompanyProfileTabProps) {
@@ -249,7 +250,7 @@ export function CompanyProfileTab({ tenant }: CompanyProfileTabProps) {
           </div>
 
           <div className="md:col-span-2 space-y-1.5">
-            <Label htmlFor="bankRIB">Relevé d'Identité Bancaire (RIB - 24 Digits)</Label>
+            <Label htmlFor="bankRIB">Relevé d&apos;Identité Bancaire (RIB - 24 Digits)</Label>
             <Input
               id="bankRIB"
               value={form.bankRIB}

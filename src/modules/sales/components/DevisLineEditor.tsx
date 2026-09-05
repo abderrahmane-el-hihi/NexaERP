@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { ProductView } from "@/shared/view-types";
 
 export interface DevisLine {
   id: string;
@@ -19,7 +20,7 @@ export interface DevisLine {
 interface DevisLineEditorProps {
   lines: DevisLine[];
   onChange: (lines: DevisLine[]) => void;
-  products: any[]; // Replace with correct product type
+  products: ProductView[];
 }
 
 const TVA_RATES = [0, 7, 10, 14, 20];
@@ -43,7 +44,7 @@ export function DevisLineEditor({ lines, onChange, products }: DevisLineEditorPr
     onChange(lines.filter((l) => l.id !== id));
   }
 
-  function updateLine(id: string, field: keyof DevisLine, value: any) {
+  function updateLine(id: string, field: keyof DevisLine, value: string | number) {
     onChange(
       lines.map((l) => {
         if (l.id !== id) return l;
@@ -54,7 +55,7 @@ export function DevisLineEditor({ lines, onChange, products }: DevisLineEditorPr
           const product = products.find((p) => p.id === value);
           if (product) {
             updated.description = product.name;
-            updated.unitPrice = product.salesPrice ?? product.priceHT ?? 0;
+            updated.unitPrice = product.salesPrice ?? 0;
             updated.tvaRate = product.tvaRate ?? 20;
           }
         }
@@ -89,7 +90,7 @@ export function DevisLineEditor({ lines, onChange, products }: DevisLineEditorPr
                 <tr key={line.id} className="group">
                   <td className="px-3 py-2">
                     <div className="space-y-2">
-                      <Select value={line.productId || "__none__"} onValueChange={(v) => updateLine(line.id, "productId", v === "__none__" || v === null ? undefined : v)}>
+                      <Select value={line.productId || "__none__"} onValueChange={(v) => updateLine(line.id, "productId", v === "__none__" || v === null ? "" : v)}>
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Select product..." />
                         </SelectTrigger>

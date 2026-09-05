@@ -1,47 +1,65 @@
-import { prisma } from "@/shared/db/prisma";
+import { withTenant } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
+import { dec, toNumber } from "@/shared/money";
+import { LEDGER_STATUSES } from "@/modules/finance/services/posting.service";
 
+/**
+ * Account balances for the dashboard, computed by the database rather than by
+ * summing every ledger line in JavaScript. At a few hundred thousand lines the old
+ * approach loaded the whole ledger into memory on every page view.
+ */
 export async function getDashboardData() {
   const tenantId = await getTenantId();
 
-  // Get all accounts and calculate their balances
-  const accounts = await prisma.account.findMany({
-    where: { tenantId },
-    include: {
-      lines: true
-    }
-  });
+  return withTenant(tenantId, async (tx) => {
+    const accounts = await tx.account.findMany({
+      where: { tenantId, isActive: true },
+      orderBy: { code: "asc" },
+    });
 
-  const processedAccounts = accounts.map(acc => {
-    const totalDebit = acc.lines.reduce((sum, line) => sum + line.debit, 0);
-    const totalCredit = acc.lines.reduce((sum, line) => sum + line.credit, 0);
-    
-    // Asset or Expense: Debit - Credit
-    // Liability, Equity, Revenue: Credit - Debit
-    const isDebitNormal = acc.type === 'Asset' || acc.type === 'Expense';
-    const balance = isDebitNormal ? (totalDebit - totalCredit) : (totalCredit - totalDebit);
+    const grouped = await tx.journalEntryLine.groupBy({
+      by: ["accountId"],
+      where: { tenantId, journalEntry: { status: { in: [...LEDGER_STATUSES] } } },
+      _sum: { debit: true, credit: true },
+    });
+
+    const byAccount = new Map(
+      grouped.map((g) => [
+        g.accountId,
+        { debit: dec(g._sum.debit ?? 0), credit: dec(g._sum.credit ?? 0) },
+      ])
+    );
+
+    const processedAccounts = accounts.map((acc) => {
+      const totals = byAccount.get(acc.id) ?? { debit: dec(0), credit: dec(0) };
+      const isDebitNormal = acc.type === "Asset" || acc.type === "Expense";
+      const balance = isDebitNormal
+        ? totals.debit.minus(totals.credit)
+        : totals.credit.minus(totals.debit);
+
+      return {
+        id: acc.id,
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+        balance: toNumber(balance),
+      };
+    });
+
+    const assets = processedAccounts.filter((a) => a.type === "Asset");
+    const liabilities = processedAccounts.filter((a) => a.type === "Liability");
+    const revenue = processedAccounts.filter((a) => a.type === "Revenue");
+
+    const total = (rows: typeof processedAccounts) =>
+      rows.reduce((acc, a) => acc + a.balance, 0);
 
     return {
-      ...acc,
-      balance
+      assets,
+      liabilities,
+      revenue,
+      totalAssets: total(assets),
+      totalLiabilities: total(liabilities),
+      totalRevenue: total(revenue),
     };
   });
-
-  // Filter into categories
-  const assets = processedAccounts.filter(a => a.type === 'Asset');
-  const liabilities = processedAccounts.filter(a => a.type === 'Liability');
-  const revenue = processedAccounts.filter(a => a.type === 'Revenue');
-
-  const totalAssets = assets.reduce((sum, a) => sum + a.balance, 0);
-  const totalLiabilities = liabilities.reduce((sum, a) => sum + a.balance, 0);
-  const totalRevenue = revenue.reduce((sum, a) => sum + a.balance, 0);
-
-  return {
-    assets,
-    liabilities,
-    revenue,
-    totalAssets,
-    totalLiabilities,
-    totalRevenue
-  };
 }

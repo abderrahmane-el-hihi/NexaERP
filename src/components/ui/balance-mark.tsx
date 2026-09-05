@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-interface BalanceMarkProps extends React.HTMLAttributes<HTMLSpanElement> {}
+type BalanceMarkProps = React.HTMLAttributes<HTMLSpanElement>;
 
 export function BalanceMark({ className, ...props }: BalanceMarkProps) {
   return (

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { motion } from "framer-motion";
 import { SparklesIcon, BriefcaseIcon, ChatBubbleLeftRightIcon, HandRaisedIcon } from "@heroicons/react/24/outline";
+import type { ComponentType } from "react";
 
-const COMPANY_PAGES: Record<string, { title: string, content: string, icon: any, color: string, glow: string }> = {
+const COMPANY_PAGES: Record<string, { title: string, content: string, icon: ComponentType<{ className?: string }>, color: string, glow: string }> = {
   about: {
     title: "About Us",
     content: "NexaERP was founded with a simple mission: to build the connected business platform that growing companies deserve. We believe you shouldn't need a million-dollar enterprise budget to get software that actually works together.",

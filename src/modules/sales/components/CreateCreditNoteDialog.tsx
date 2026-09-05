@@ -15,9 +15,10 @@ import {
 import { createCreditNoteFromInvoice } from "../services/credit-note.service";
 import { ArrowUturnLeftIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { InvoiceView } from "@/shared/view-types";
 
 interface CreateCreditNoteDialogProps {
-  invoice: any;
+  invoice: InvoiceView;
 }
 
 export function CreateCreditNoteDialog({ invoice }: CreateCreditNoteDialogProps) {
@@ -57,7 +58,7 @@ export function CreateCreditNoteDialog({ invoice }: CreateCreditNoteDialogProps)
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-900">
             <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
-            Issue Credit Note / Facture d'Avoir
+            Issue Credit Note / Facture d&apos;Avoir
           </DialogTitle>
         </DialogHeader>
 
@@ -77,7 +78,7 @@ export function CreateCreditNoteDialog({ invoice }: CreateCreditNoteDialogProps)
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="reasonInput">Reason for Credit Note (Motif de l'Avoir) *</Label>
+            <Label htmlFor="reasonInput">Reason for Credit Note (Motif de l&apos;Avoir) *</Label>
             <Input
               id="reasonInput"
               required

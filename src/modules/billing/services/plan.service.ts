@@ -1,13 +1,14 @@
 "use server";
 
-import { prisma } from "@/shared/db/prisma";
+import { scopedPrisma } from "@/shared/db/prisma";
 import { getTenantId } from "@/lib/auth";
 import { SAAS_PLANS, type SaaSPlanTier, type PlanDefinition } from "../config/plans.config";
+import type { TenantModuleSettings } from "@/modules/tenant/services/tenant.service";
 
 export async function getTenantPlanDetails() {
   const tenantId = await getTenantId();
 
-  const tenant = await prisma.tenant.findUnique({
+  const tenant = await scopedPrisma(tenantId).tenant.findUnique({
     where: { id: tenantId },
     include: {
       memberships: true,
@@ -33,15 +34,15 @@ export async function upgradeTenantPlan(newPlanId: SaaSPlanTier) {
   const targetPlan = SAAS_PLANS[newPlanId];
   if (!targetPlan) throw new Error("Invalid plan tier selected");
 
-  const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  const existingModules = (existing?.enabledModules as Record<string, any>) || {};
+  const existing = await scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } });
+  const existingModules = (existing?.enabledModules as TenantModuleSettings) || {};
 
   const updatedModules = {
     ...existingModules,
     modules: targetPlan.allowedModules,
   };
 
-  return await prisma.tenant.update({
+  return await scopedPrisma(tenantId).tenant.update({
     where: { id: tenantId },
     data: {
       subscriptionPlan: newPlanId,

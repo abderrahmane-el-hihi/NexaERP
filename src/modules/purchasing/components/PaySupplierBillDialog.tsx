@@ -21,9 +21,10 @@ import {
 import { paySupplierBill } from "../services/purchase-order.service";
 import { CreditCardIcon, BuildingLibraryIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import type { SupplierBillView } from "@/shared/view-types";
 
 interface PaySupplierBillDialogProps {
-  bill: any;
+  bill: SupplierBillView;
 }
 
 export function PaySupplierBillDialog({ bill }: PaySupplierBillDialogProps) {
@@ -43,7 +44,7 @@ export function PaySupplierBillDialog({ bill }: PaySupplierBillDialogProps) {
       await paySupplierBill({
         billId: bill.id,
         amount: Number(amount),
-        paymentMethod: method,
+        method: method,
         reference,
       });
       setOpen(false);

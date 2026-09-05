@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import { convertDevisToInvoice } from "@/modules/sales/services/invoice.service";
 import { useRouter } from "next/navigation";
+import { messageOf } from "@/shared/errors";
 
 export function ConvertDevisToInvoiceButton({ devisId }: { devisId: string }) {
   const router = useRouter();
@@ -14,8 +15,8 @@ export function ConvertDevisToInvoiceButton({ devisId }: { devisId: string }) {
       await convertDevisToInvoice(devisId);
       alert("Invoice created successfully!");
       router.push("/dashboard/sales/invoices");
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (err: unknown) {
+      alert("Error: " + messageOf(err));
     }
   }
 
