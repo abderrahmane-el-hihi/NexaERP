@@ -22,11 +22,11 @@ export default function CtaSection() {
       <div className="max-w-[1120px] mx-auto px-6 relative z-10 text-center flex flex-col items-center">
         <motion.div {...fadeInUp}>
           <h2 className="text-[clamp(2.5rem,5vw,4rem)] leading-[1.05] font-[var(--font-bricolage)] font-bold tracking-[-0.03em] text-[var(--color-ink)] mb-6 max-w-2xl mx-auto">
-            Vos factures de janvier peuvent déjà être conformes.
+            Votre facturation peut déjà être parfaitement structurée.
           </h2>
           
           <p className="text-[clamp(1.125rem,2vw,1.25rem)] leading-[1.65] text-[var(--color-ink-soft)] max-w-xl mx-auto mb-10">
-            Trente minutes pour ouvrir votre compte et émettre une première facture validée. On vous accompagne pour la reprise de vos clients et de vos produits.
+            Trente minutes pour ouvrir votre compte et émettre votre première facture. Nous vous accompagnons pour la reprise de vos clients et de vos produits.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

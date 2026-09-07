@@ -26,7 +26,7 @@ const PRODUCTS: Record<string, { title: string, subtitle: string, icon: Componen
     title: "Ventes & Facturation",
     subtitle: "Éditez vos factures et faites-vous payer plus rapidement.",
     icon: CreditCardIcon,
-    features: ["Devis en 1 clic", "Bons de livraison", "Factures conformes DGI", "Avoirs", "Relances automatiques"],
+    features: ["Devis en 1 clic", "Bons de livraison", "Facturation structurée & mentions légales", "Avoirs", "Relances automatiques"],
     theme: "text-[var(--color-terre)]"
   },
   hr: {

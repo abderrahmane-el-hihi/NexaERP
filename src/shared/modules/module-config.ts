@@ -64,11 +64,11 @@ export const MODULES: Record<ModuleCode, ModuleDefinition> = {
   },
   COMP: {
     code: "COMP",
-    name: "Compliance & E-Invoicing",
+    name: "Facturation Structurée & Télé-transmission",
     description:
-      "Moroccan DGI e-invoicing (Simpl-TVA). Activates automatically when tenant's wave date arrives.",
+      "Génération UBL 2.1 et préparation au raccordement fiscal électronique selon les spécifications applicables.",
     alwaysOn: false,
-    optIn: false, // auto-activated by wave date, not manual opt-in
+    optIn: false,
   },
   DOC: {
     code: "DOC",

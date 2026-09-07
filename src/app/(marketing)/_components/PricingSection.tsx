@@ -18,10 +18,10 @@ export default function PricingSection() {
         </h2>
         
         <div className="border-l-4 border-[var(--color-safran)] pl-6 py-2 mb-12 bg-[var(--color-paper-deep)] p-4 rounded-r-[2px]">
-          <p className="font-bold text-[var(--color-ink)]">Jusqu&apos;à 90 % pris en charge.</p>
+          <p className="font-bold text-[var(--color-ink)]">Assistance aux programmes de numérisation TPME.</p>
           <p className="text-[var(--color-ink-soft)]">
-            Les programmes publics de digitalisation couvrent une large part du coût pour les TPE et PME. Nous montons le dossier avec vous.<br/>
-            <span className="italic text-sm">Éligibilité à confirmer selon votre situation.</span>
+            Les dispositifs publics d&apos;appui à la digitalisation (ex. Maroc PME / Mowakaba) peuvent prendre en charge une partie importante des coûts selon les critères d&apos;éligibilité. Nous vous assistons dans le montage de votre dossier.<br/>
+            <span className="italic text-sm">Prise en charge conditionnée à l&apos;approbation de votre organisme de financement.</span>
           </p>
         </div>
       </motion.div>
@@ -31,12 +31,12 @@ export default function PricingSection() {
         <motion.div {...fadeInUp} transition={{ delay: 0.1 }} className="border border-[var(--color-rule)] p-8 rounded-[2px] flex flex-col bg-[var(--color-paper)]">
           <h3 className="text-xl font-bold font-[var(--font-bricolage)] text-[var(--color-ink)] mb-2 uppercase tracking-wide">Essentiel</h3>
           <div className="font-mono text-2xl font-bold text-[var(--color-ink)] mb-1">4 800 MAD/an</div>
-          <div className="font-mono text-xs text-[var(--color-ink-soft)] mb-8">à partir de 480 MAD/an après subvention</div>
+          <div className="font-mono text-xs text-[var(--color-ink-soft)] mb-8">Facturation annuelle · Éligible dossiers d&apos;aide</div>
           
           <div className="text-sm text-[var(--color-ink-soft)] mb-8 font-medium">2 Utilisateurs</div>
           
           <p className="text-sm text-[var(--color-ink)] leading-relaxed mb-8 flex-grow">
-            Facturation + DGI, clients, TVA, relances
+            Facturation structurée, gestion clients, TVA, relances
           </p>
           
           <Link href="/signup" className="block text-center w-full py-3 rounded-[6px] text-[var(--color-ink)] border border-[var(--color-rule)] font-semibold hover:bg-[var(--color-paper-deep)] hover:-translate-y-[1px] transition-all">
@@ -50,12 +50,12 @@ export default function PricingSection() {
           
           <h3 className="text-xl font-bold font-[var(--font-bricolage)] text-[var(--color-cachet)] mb-2 uppercase tracking-wide">Gestion</h3>
           <div className="font-mono text-2xl font-bold text-[var(--color-ink)] mb-1">12 000 MAD/an</div>
-          <div className="font-mono text-xs text-[var(--color-cachet)] mb-8 opacity-80">à partir de 1 200 MAD/an après subvention</div>
+          <div className="font-mono text-xs text-[var(--color-cachet)] mb-8 opacity-80">Facturation annuelle · Éligible dossiers d&apos;aide</div>
           
           <div className="text-sm text-[var(--color-ink-soft)] mb-8 font-medium">5 Utilisateurs</div>
           
           <p className="text-sm text-[var(--color-ink)] leading-relaxed mb-8 flex-grow">
-            + achats, stock, marge, rapprochement bancaire
+            + achats, gestion de stock, marges, préparation au raccordement
           </p>
           
           <Link href="/signup" className="block text-center w-full py-3 rounded-[6px] bg-[var(--color-cachet)] text-white font-bold hover:-translate-y-[1px] shadow-sm hover:shadow transition-all">
@@ -67,12 +67,12 @@ export default function PricingSection() {
         <motion.div {...fadeInUp} transition={{ delay: 0.3 }} className="border border-[var(--color-rule)] p-8 rounded-[2px] flex flex-col bg-[var(--color-paper)]">
           <h3 className="text-xl font-bold font-[var(--font-bricolage)] text-[var(--color-ink)] mb-2 uppercase tracking-wide">Complet</h3>
           <div className="font-mono text-2xl font-bold text-[var(--color-ink)] mb-1">24 000 MAD/an</div>
-          <div className="font-mono text-xs text-[var(--color-ink-soft)] mb-8">à partir de 2 400 MAD/an après subvention</div>
+          <div className="font-mono text-xs text-[var(--color-ink-soft)] mb-8">Facturation annuelle · Éligible dossiers d&apos;aide</div>
           
           <div className="text-sm text-[var(--color-ink-soft)] mb-8 font-medium">12 Utilisateurs</div>
           
           <p className="text-sm text-[var(--color-ink)] leading-relaxed mb-8 flex-grow">
-            + comptabilité complète, multi-site, support prioritaire
+            + comptabilité générale, multi-dépôts, support prioritaire
           </p>
           
           <Link href="/company/contact" className="block text-center w-full py-3 rounded-[6px] text-[var(--color-ink)] border border-[var(--color-rule)] font-semibold hover:bg-[var(--color-paper-deep)] hover:-translate-y-[1px] transition-all">

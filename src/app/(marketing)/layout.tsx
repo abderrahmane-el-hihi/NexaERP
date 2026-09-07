@@ -24,8 +24,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata = {
-  title: "NexaERP - Vos factures de janvier peuvent déjà être conformes",
-  description: "Trente minutes pour ouvrir votre compte et émettre une première facture validée.",
+  title: "NexaERP — Facturation structurée & ERP pour PME marocaines",
+  description: "La plateforme intégrée de facturation, stocks et gestion commerciale pour les entreprises marocaines.",
 };
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {

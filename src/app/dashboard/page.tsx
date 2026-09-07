@@ -11,6 +11,9 @@ import {
 import { BalanceMark } from "@/components/ui/balance-mark";
 import { getDashboardData } from "@/modules/dashboard/services/dashboard.service";
 import { getDictionary } from "@/i18n/i18n.service";
+import { getTenantId } from "@/lib/auth";
+import { getActivationStatus } from "@/modules/tenant/services/activation.service";
+import { ActivationChecklist } from "@/modules/tenant/components/ActivationChecklist";
 
 // Simple formatter
 const formatCurrency = (amount: number) => {
@@ -18,8 +21,12 @@ const formatCurrency = (amount: number) => {
 };
 
 export default async function DashboardPage() {
-  const data = await getDashboardData();
-  const dict = await getDictionary();
+  const tenantId = await getTenantId();
+  const [data, dict, activationStatus] = await Promise.all([
+    getDashboardData(),
+    getDictionary(),
+    getActivationStatus(tenantId).catch(() => null),
+  ]);
   const d = dict.dashboard;
 
   return (
@@ -39,6 +46,11 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Activation Checklist Banner */}
+      {activationStatus && (
+        <ActivationChecklist status={activationStatus} />
+      )}
 
       {/* Assets */}
       <div className="space-y-4">

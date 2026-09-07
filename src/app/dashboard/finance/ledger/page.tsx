@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntries } from "@/modules/fi/services/ledger.service";
+import { ImportOpeningBalancesDialog } from "@/modules/importer/components/ImportOpeningBalancesDialog";
 
 export default async function LedgerPage() {
   const entries = await getJournalEntries();
@@ -14,9 +15,12 @@ export default async function LedgerPage() {
             View all accounting journal entries and double-entry records (FI-GL).
           </p>
         </div>
-        <Button>
-          New Manual Entry
-        </Button>
+        <div className="flex items-center gap-3">
+          <ImportOpeningBalancesDialog />
+          <Button>
+            New Manual Entry
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">

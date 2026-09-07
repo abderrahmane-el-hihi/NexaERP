@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function RejectionSection() {
@@ -23,7 +24,7 @@ export default function RejectionSection() {
         
         <div className="bg-[var(--color-paper-deep)] p-8 rounded-[2px] border border-[var(--color-rule)] mb-8 font-mono text-sm relative">
           <div className="text-[var(--color-terre)] font-bold mb-4 flex items-center gap-2">
-            <span>✕</span> Rejetée par la plateforme
+            <span>✕</span> Rejetée par le pré-contrôle
           </div>
           <div className="text-[var(--color-ink-soft)] mb-6">
             ICE_MISSING · champ : client.ICE
@@ -33,11 +34,17 @@ export default function RejectionSection() {
             Renseignez-le dans la fiche de MAROC PIÈCES AUTO SARL.
           </div>
           
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-[var(--color-rule)] pt-4 mt-8">
-            <button className="bg-[var(--color-terre)] text-[var(--color-paper)] px-4 py-2 font-bold hover:opacity-90 rounded-[6px] mb-4 sm:mb-0">
-              Corriger et renvoyer
-            </button>
-            <div className="text-[var(--color-ink-soft)]">Facture n° FA-2027-00015 · conservée</div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-[var(--color-rule)] pt-4 mt-8 gap-4">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 bg-[var(--color-terre)] text-[var(--color-paper)] px-4 py-2 font-bold hover:opacity-90 rounded-[6px] transition-all text-sm"
+              >
+                Tester ce flux en démo &rarr;
+              </Link>
+              <span className="text-xs text-[var(--color-ink-soft)] italic">(Exemple de pré-contrôle)</span>
+            </div>
+            <div className="text-[var(--color-ink-soft)] text-xs">Facture n° FA-2027-00015 · conservée</div>
           </div>
         </div>
         

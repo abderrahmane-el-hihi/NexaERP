@@ -1,18 +1,14 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DocumentCheckIcon, ShieldExclamationIcon, CheckCircleIcon, ArrowTopRightOnSquareIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { DocumentCheckIcon, CheckCircleIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface ComplianceDGITabProps {
   tenant: TenantSettingsData;
 }
 
-export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {
-  const extra = tenant.enabledModules || {};
-  const currentWave = extra.dgiWave || "Wave3";
-
+export function ComplianceDGITab({ tenant: _tenant }: ComplianceDGITabProps) {
   return (
     <div className="space-y-6">
       {/* Overview Banner */}
@@ -22,69 +18,85 @@ export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {
             <div className="flex items-center gap-2">
               <DocumentCheckIcon className="h-6 w-6 text-emerald-700" />
               <h2 className="text-lg font-bold text-emerald-950">
-                Morocco DGI Electronic Invoicing Mandate (Article 145 CGI)
+                Préparation à la Facturation Électronique Structurée
               </h2>
             </div>
             <p className="text-sm text-emerald-900/80 max-w-3xl leading-relaxed">
-              NexaERP is natively engineered for the Moroccan government clearance model.
-              All invoices generate compliant structured data ready for electronic submission to the
-              DGI <strong>Simpl-TVA</strong> platform.
+              NexaERP structure vos données de facturation (mentions légales, identifiants fiscaux,
+              numérotation séquentielle sans rupture et archivage) pour préparer votre entreprise aux
+              exigences de traçabilité fiscale et aux futurs raccordements de télé-transmission.
             </p>
           </div>
           <Badge className="bg-emerald-700 text-white font-mono">
-            Compliance Ready
+            Architecture Prête
           </Badge>
         </div>
       </div>
 
-      {/* 3 Waves Status Cards */}
+      {/* Integration Readiness Status */}
       <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
-        <h3 className="font-semibold text-base">Regulatory Rollout Waves &amp; Eligibility</h3>
+        <h3 className="font-semibold text-base">Statut d&apos;Intégration &amp; Télé-transmission</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Wave 1 */}
-          <div className={`p-4 rounded-xl border ${currentWave === "Wave1" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-muted/20"}`}>
+          <div className="p-4 rounded-xl border border-border bg-muted/20">
             <div className="flex justify-between items-start mb-2">
-              <span className="font-semibold text-sm">Wave 1 — Jan 2026</span>
-              {currentWave === "Wave1" && <Badge variant="default">Your Wave</Badge>}
+              <span className="font-semibold text-sm">Génération UBL 2.1</span>
+              <Badge variant="default" className="bg-emerald-600">Actif</Badge>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">Large Companies (CA &gt; 200M MAD) and public-sector suppliers.</p>
-            <span className="text-[11px] font-mono font-medium text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">Active Mandate</span>
+            <p className="text-xs text-muted-foreground mb-2">
+              Format XML structuré conforme aux standards internationaux de facturation électronique.
+            </p>
+            <span className="text-[11px] font-mono font-medium text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">
+              Génération Locale
+            </span>
           </div>
 
-          {/* Wave 2 */}
-          <div className={`p-4 rounded-xl border ${currentWave === "Wave2" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-muted/20"}`}>
+          <div className="p-4 rounded-xl border border-border bg-muted/20">
             <div className="flex justify-between items-start mb-2">
-              <span className="font-semibold text-sm">Wave 2 — Jul 2026</span>
-              {currentWave === "Wave2" && <Badge variant="default">Your Wave</Badge>}
+              <span className="font-semibold text-sm">Transport de Télé-transmission</span>
+              <Badge variant="secondary">Sandbox</Badge>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">Mid-sized Enterprises (CA 10M MAD to 200M MAD).</p>
-            <span className="text-[11px] font-mono font-medium text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded">Pre-Rollout</span>
+            <p className="text-xs text-muted-foreground mb-2">
+              Simulateur actif. Raccordement direct en attente de publication des contrats et agréments officiels.
+            </p>
+            <span className="text-[11px] font-mono font-medium text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded">
+              Prêt pour Connecteur
+            </span>
           </div>
 
-          {/* Wave 3 */}
-          <div className={`p-4 rounded-xl border ${currentWave === "Wave3" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-muted/20"}`}>
+          <div className="p-4 rounded-xl border border-border bg-muted/20">
             <div className="flex justify-between items-start mb-2">
-              <span className="font-semibold text-sm">Wave 3 — Jan 2027</span>
-              {currentWave === "Wave3" && <Badge variant="default">Your Wave</Badge>}
+              <span className="font-semibold text-sm">Contrôle Fiscal &amp; Piste d&apos;Audit</span>
+              <Badge variant="default" className="bg-emerald-600">Actif</Badge>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">SMEs &amp; Micro-enterprises (TPE / PME with CA &lt; 10M MAD).</p>
-            <span className="text-[11px] font-mono font-medium text-purple-700 bg-purple-100/60 px-2 py-0.5 rounded">Target Wave (MVP)</span>
+            <p className="text-xs text-muted-foreground mb-2">
+              Immutabilité des pièces après émission, gestion des avoirs et journal d&apos;audit horodaté.
+            </p>
+            <span className="text-[11px] font-mono font-medium text-purple-700 bg-purple-100/60 px-2 py-0.5 rounded">
+              Invariants Scellés
+            </span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
+          <InformationCircleIcon className="h-4 w-4 shrink-0 text-slate-500" />
+          <span>
+            Les dates d&apos;obligation et modalités de raccordement direct dépendent de la parution des décrets d&apos;application officiels.
+          </span>
         </div>
       </div>
 
       {/* Compliance Architecture Checklist */}
       <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
-        <h3 className="font-semibold text-base">In-Engine Compliance Invariants</h3>
+        <h3 className="font-semibold text-base">Invariants Métier &amp; Rigueur Comptable</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-start gap-3 p-3.5 border rounded-lg bg-slate-50/50">
             <CheckCircleIcon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">Gapless Sequential Numbering</p>
+              <p className="font-semibold text-sm">Numérotation Séquentielle Sans Rupture</p>
               <p className="text-xs text-muted-foreground">
-                Invoice numbers are allocated atomically inside database transactions per fiscal year (e.g. <code>FA-2026-00001</code>).
+                Attribution atomique du numéro de facture dans la transaction de validation (ex. <code>FA-2026-00001</code>).
               </p>
             </div>
           </div>
@@ -92,9 +104,9 @@ export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {
           <div className="flex items-start gap-3 p-3.5 border rounded-lg bg-slate-50/50">
             <CheckCircleIcon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">Post-Finalization Immutability</p>
+              <p className="font-semibold text-sm">Immutabilité après Émission</p>
               <p className="text-xs text-muted-foreground">
-                Finalized invoices cannot be modified. Legal corrections require an automated Credit Note (Avoir).
+                Une facture émise ne peut être modifiée ni supprimée. Toute correction légale s&apos;opère par Avoir / Note de crédit.
               </p>
             </div>
           </div>
@@ -102,9 +114,9 @@ export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {
           <div className="flex items-start gap-3 p-3.5 border rounded-lg bg-slate-50/50">
             <CheckCircleIcon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">Structured UBL 2.1 &amp; CII Payload</p>
+              <p className="font-semibold text-sm">Données Structurées UBL 2.1</p>
               <p className="text-xs text-muted-foreground">
-                Invoice data is stored with structured XML tags compatible with DGI Simpl-TVA clearance ingestion.
+                Chaque facture génère une structure XML normalisée contenant l&apos;ensemble des mentions obligatoires et ventilation de TVA.
               </p>
             </div>
           </div>
@@ -112,9 +124,9 @@ export function ComplianceDGITab({ tenant }: ComplianceDGITabProps) {
           <div className="flex items-start gap-3 p-3.5 border rounded-lg bg-slate-50/50">
             <CheckCircleIcon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">MOWAKABA Transition Program</p>
+              <p className="font-semibold text-sm">Assistance aux Programmes de Digitalisation</p>
               <p className="text-xs text-muted-foreground">
-                TPEs in Morocco can obtain up to 90% government subsidy through Maroc PME for NexaERP deployment.
+                Assistance au montage des dossiers d&apos;éligibilité pour les programmes d&apos;appui aux TPME (ex. Maroc PME / Mowakaba), sous réserve d&apos;éligibilité.
               </p>
             </div>
           </div>

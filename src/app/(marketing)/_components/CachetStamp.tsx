@@ -1,5 +1,4 @@
-"use client";
-import { motion, MotionProps } from "framer-motion";
+import type { MotionProps } from "framer-motion";
 
 export const stampAnimation: MotionProps = {
   initial: { opacity: 0, scale: 1.6, rotate: 0 },
@@ -15,7 +14,7 @@ export default function CachetStamp({ reference }: { reference?: string }) {
         <path id="curve" d="M 50 10 A 40 40 0 1 1 49.9 10" fill="transparent" />
         <text className="font-bold text-[10px] tracking-widest uppercase">
           <textPath href="#curve" startOffset="50%" textAnchor="middle">
-            Validée · DGI · Validée · DGI
+            Certifiée · NexaERP · Émise · Conforme
           </textPath>
         </text>
         <circle cx="50" cy="50" r="32" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2 8 3" fill="transparent" className="opacity-80" />

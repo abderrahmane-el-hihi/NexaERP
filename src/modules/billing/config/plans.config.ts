@@ -63,7 +63,7 @@ export const SAAS_PLANS: Record<SaaSPlanTier, PlanDefinition> = {
       "Financial Statements (CPC / P&L, Bilan Actif-Passif)",
       "Aged AR & AP Balance Âgée",
       "Moroccan Payroll Engine (CNSS/AMO/IGR Payslips)",
-      "DGI Simpl-TVA Clearance XML (Article 145 CGI)",
+      "Données structurées XML UBL 2.1 (Prêt pour télé-transmission)",
       "Unlimited Users & Warehouses",
       "Priority Support & CNDP Data Portability",
     ],

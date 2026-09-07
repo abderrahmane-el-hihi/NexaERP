@@ -23,29 +23,29 @@ export default function HeroSection() {
       <div className="flex-1 max-w-lg space-y-8">
         <div className="flex items-center gap-3 text-[var(--color-safran)] font-mono text-sm uppercase tracking-widest font-medium">
           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2L22 22H2L12 2Z"/></svg>
-          Facturation Électronique — DGI
+          Facturation Structurée &amp; Gestion PME
         </div>
         
         <h1 className="text-[clamp(2.75rem,6vw,5rem)] leading-[1.02] font-[var(--font-bricolage)] font-bold tracking-[-0.03em] text-[var(--color-ink)]">
-          À partir de janvier,<br />
-          une facture non validée<br />
-          n&apos;est plus une facture.
+          Factures claires,<br />
+          stocks maîtrisés,<br />
+          zéro litige fiscal.
         </h1>
         
         <p className="text-[clamp(1.125rem,2vw,1.25rem)] leading-[1.65] text-[var(--color-ink-soft)] max-w-md">
-          NexaERP transmet vos factures à la plateforme de la DGI, récupère la validation, et vous prévient si quelque chose bloque.
+          NexaERP structure vos devis, factures, encaissements et TVA dans un flux marocain rigoureux — préparé pour les futurs raccordements fiscaux.
         </p>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4">
           <Link href="/signup" className="px-6 py-3 rounded-[6px] bg-[var(--color-cachet)] text-white font-bold hover:-translate-y-[1px] shadow-sm hover:shadow transition-all">
-            Voir une facture validée
+            Tester gratuitement
           </Link>
           <Link href="/company/contact" className="px-6 py-3 rounded-[6px] text-[var(--color-ink)] border border-[var(--color-rule)] font-semibold hover:bg-[var(--color-paper-deep)] hover:-translate-y-[1px] transition-all">
             Parler à quelqu&apos;un
           </Link>
         </div>
         
-        <p className="font-mono text-sm text-[var(--color-safran)] pt-4">J–117 avant l&apos;obligation</p>
+        <p className="font-mono text-sm text-[var(--color-safran)] pt-4">Numérotation sans rupture · Données structurées · TVA prête</p>
       </div>
 
       {/* Right Column: Invoice Document */}

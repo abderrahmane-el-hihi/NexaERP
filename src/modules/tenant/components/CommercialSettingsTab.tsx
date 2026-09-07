@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateCommercialSettings } from "../services/tenant.service";
-import { ReceiptRefundIcon, CheckIcon, CalculatorIcon, ClockIcon, DocumentTextIcon, TagIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, CalculatorIcon, ClockIcon, DocumentTextIcon, TagIcon } from "@heroicons/react/24/outline";
 import type { TenantSettingsData } from "@/modules/tenant/services/tenant.service";
 
 interface CommercialSettingsTabProps {
@@ -32,7 +31,6 @@ export function CommercialSettingsTab({ tenant }: CommercialSettingsTabProps) {
     defaultPaymentTerms: extra.defaultPaymentTerms !== undefined ? Number(extra.defaultPaymentTerms) : 30,
     defaultDevisValidity: extra.defaultDevisValidity !== undefined ? Number(extra.defaultDevisValidity) : 15,
     invoiceFooterNote: extra.invoiceFooterNote || "SARL au capital de 100.000 DH — RC Casablanca — IF 12345678 — ICE 001234567000088",
-    dgiWave: extra.dgiWave || "Wave3",
   });
 
   function handleChange(key: string, value: string | number | boolean) {
@@ -58,7 +56,7 @@ export function CommercialSettingsTab({ tenant }: CommercialSettingsTabProps) {
           <h2 className="font-semibold text-base">Currency & Moroccan Tax (TVA) Defaults</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="defaultCurrency">Default Currency (Devise Principale)</Label>
             <Select
@@ -97,24 +95,6 @@ export function CommercialSettingsTab({ tenant }: CommercialSettingsTabProps) {
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">Pre-selected rate when adding catalog products.</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="dgiWave">DGI E-Invoicing Rollout Wave</Label>
-            <Select
-              value={form.dgiWave}
-              onValueChange={(v) => handleChange("dgiWave", v || "Wave3")}
-            >
-              <SelectTrigger id="dgiWave">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Wave1">Wave 1 — 1 Jan 2026 (CA &gt; 200M MAD)</SelectItem>
-                <SelectItem value="Wave2">Wave 2 — 1 Jul 2026 (CA 10M–200M MAD)</SelectItem>
-                <SelectItem value="Wave3">Wave 3 — 1 Jan 2027 (TPE/PME &lt; 10M MAD)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">Sets government clearance enforcement date.</p>
           </div>
         </div>
       </div>

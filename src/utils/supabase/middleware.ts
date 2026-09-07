@@ -37,7 +37,7 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
-    request.nextUrl.pathname.startsWith('/dashboard')
+    (request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/onboarding'))
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
@@ -48,7 +48,9 @@ export async function updateSession(request: NextRequest) {
   // If user is logged in and tries to access auth pages, redirect to dashboard
   if (
     user && 
-    (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))
+    (request.nextUrl.pathname.startsWith('/login') || 
+     request.nextUrl.pathname.startsWith('/signup') ||
+     request.nextUrl.pathname.startsWith('/forgot-password'))
   ) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'

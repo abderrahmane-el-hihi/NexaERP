@@ -211,7 +211,7 @@ export async function updateCommercialSettings(data: {
   defaultPaymentTerms: number;
   defaultDevisValidity: number;
   invoiceFooterNote: string;
-  dgiWave: string;
+  dgiWave?: string;
 }) {
   const tenantId = await getTenantId();
   const existing = await scopedPrisma(tenantId).tenant.findUnique({ where: { id: tenantId } });
@@ -223,7 +223,7 @@ export async function updateCommercialSettings(data: {
     defaultPaymentTerms: data.defaultPaymentTerms,
     defaultDevisValidity: data.defaultDevisValidity,
     invoiceFooterNote: data.invoiceFooterNote,
-    dgiWave: data.dgiWave,
+    ...(data.dgiWave ? { dgiWave: data.dgiWave } : {}),
   };
 
   return await scopedPrisma(tenantId).tenant.update({
