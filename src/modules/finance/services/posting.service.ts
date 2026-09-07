@@ -151,20 +151,21 @@ export async function postEntry(tx: Tx, input: PostingInput) {
   const journalId = await journalIdFor(tx, tenantId, input.journalCode);
   const number = await nextNumber(tx, tenantId, "JournalEntry", date.getFullYear());
 
-  const resolved = await Promise.all(
-    lines.map(async (line, index) => {
-      const account = await accountByCode(tx, tenantId, line.accountCode);
-      return {
-        tenantId,
-        accountId: account.id,
-        companyId: line.companyId ?? null,
-        debit: new Prisma.Decimal(dec(line.debit ?? 0).toFixed(6)),
-        credit: new Prisma.Decimal(dec(line.credit ?? 0).toFixed(6)),
-        description: line.description ?? description,
-        position: index,
-      };
-    })
-  );
+  const resolved = [];
+  let index = 0;
+  for (const line of lines) {
+    const account = await accountByCode(tx, tenantId, line.accountCode);
+    resolved.push({
+      tenantId,
+      accountId: account.id,
+      companyId: line.companyId ?? null,
+      debit: new Prisma.Decimal(dec(line.debit ?? 0).toFixed(6)),
+      credit: new Prisma.Decimal(dec(line.credit ?? 0).toFixed(6)),
+      description: line.description ?? description,
+      position: index,
+    });
+    index++;
+  }
 
   const entry = await tx.journalEntry.create({
     data: {

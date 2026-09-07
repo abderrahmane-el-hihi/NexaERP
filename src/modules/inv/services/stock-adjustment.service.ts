@@ -9,13 +9,14 @@ import { applyMovement } from "./stock-ledger.service";
 export async function getStockAdjustmentPrerequisites() {
   const tenantId = await getTenantId();
   const data = await withTenant(tenantId, async (tx) => {
-    const [products, warehouses] = await Promise.all([
-      tx.product.findMany({
-        where: { tenantId, type: "good", isActive: true },
-        orderBy: { name: "asc" },
-      }),
-      tx.warehouse.findMany({ where: { tenantId }, orderBy: { isDefault: "desc" } }),
-    ]);
+    const products = await tx.product.findMany({
+      where: { tenantId, type: "good", isActive: true },
+      orderBy: { name: "asc" },
+    });
+    const warehouses = await tx.warehouse.findMany({
+      where: { tenantId },
+      orderBy: { name: "asc" },
+    });
     return { products, warehouses };
   });
   return serialize(data);

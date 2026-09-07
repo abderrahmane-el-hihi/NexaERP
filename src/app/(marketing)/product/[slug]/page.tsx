@@ -4,41 +4,37 @@ import { use } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { motion } from "framer-motion";
-import { BanknotesIcon, CubeIcon, CreditCardIcon, UserGroupIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { BanknotesIcon, CubeIcon, CreditCardIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import type { ComponentType } from "react";
 
-const PRODUCTS: Record<string, { title: string, subtitle: string, icon: ComponentType<{ className?: string }>, features: string[], color: string, glow: string }> = {
+const PRODUCTS: Record<string, { title: string, subtitle: string, icon: ComponentType<{ className?: string }>, features: string[], theme: string }> = {
   finance: {
-    title: "Financial Accounting",
-    subtitle: "Keep your books flawless automatically.",
+    title: "Comptabilité & Finance",
+    subtitle: "Gagnez du temps sur votre saisie comptable et collaborez avec votre expert.",
     icon: BanknotesIcon,
-    features: ["General Ledger", "Accounts Payable", "Accounts Receivable", "Trial Balance", "Journal Entries"],
-    color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-    glow: "bg-indigo-500/20"
+    features: ["Plan comptable marocain", "TVA prête à déclarer", "Rapprochement bancaire", "Journaux d'achat et vente", "Bilan et compte de résultat"],
+    theme: "text-[var(--color-safran)]"
   },
   inventory: {
-    title: "Inventory Ops",
-    subtitle: "Never run out of stock unexpectedly.",
+    title: "Gestion de Stock",
+    subtitle: "Ne soyez plus jamais en rupture de stock par surprise.",
     icon: CubeIcon,
-    features: ["Multi-warehouse", "Lot tracking", "Reorder points", "Purchase Orders", "Supplier Bills"],
-    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    glow: "bg-emerald-500/20"
+    features: ["Multi-dépôts", "Traçabilité des lots", "Alertes de réapprovisionnement", "Bons de commande fournisseurs", "Bons de réception"],
+    theme: "text-[var(--color-zellige)]"
   },
   sales: {
-    title: "Sales & Invoicing",
-    subtitle: "Get invoices out and paid faster.",
+    title: "Ventes & Facturation",
+    subtitle: "Éditez vos factures et faites-vous payer plus rapidement.",
     icon: CreditCardIcon,
-    features: ["Quotes to Orders", "Delivery Notes", "Branded Invoices", "Credit Notes", "Sales Analytics"],
-    color: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    glow: "bg-orange-500/20"
+    features: ["Devis en 1 clic", "Bons de livraison", "Factures conformes DGI", "Avoirs", "Relances automatiques"],
+    theme: "text-[var(--color-terre)]"
   },
   hr: {
-    title: "HR & Payroll",
-    subtitle: "Manage your team simply.",
+    title: "RH & Paie",
+    subtitle: "Gérez votre équipe avec simplicité et rigueur.",
     icon: UserGroupIcon,
-    features: ["Employee Records", "Time Off", "Payroll Runs", "Payslip Generation", "Role Management"],
-    color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    glow: "bg-blue-500/20"
+    features: ["Dossiers du personnel", "Gestion des congés", "Calcul de la paie", "Génération des fiches de paie", "Déclarations CNSS"],
+    theme: "text-[var(--color-cachet)]"
   }
 };
 
@@ -51,65 +47,79 @@ export default function ProductPage(props: { params: Promise<{ slug: string }> }
   const Icon = data.icon;
 
   return (
-    <div className="py-24 px-6 max-w-5xl mx-auto min-h-[80vh]">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <Link href="/" className="text-sm font-medium text-gray-500 hover:text-white mb-12 inline-flex items-center gap-2 transition-colors">
-          &larr; Back to Home
-        </Link>
-        
-        <div className="flex flex-col md:flex-row gap-16 items-center">
-          <div className="flex-1">
-            <div className={`w-16 h-16 rounded-2xl ${data.color} border flex items-center justify-center mb-8 backdrop-blur-md shadow-lg`}>
-              <Icon className="w-8 h-8" />
-            </div>
-            <h1 className="text-5xl md:text-6xl font-extrabold text-white mb-6 tracking-tight">{data.title}</h1>
-            <p className="text-xl text-gray-400 mb-10 font-light leading-relaxed">{data.subtitle}</p>
-            <ul className="space-y-5 mb-12">
-              {data.features.map((f, i) => (
-                <li key={i} className="flex items-center gap-4 text-gray-300 font-medium">
-                  <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <CheckIcon className="w-3 h-3 text-white" />
-                  </div>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/signup" className="inline-block bg-white hover:bg-gray-200 text-black px-10 py-4 rounded-full text-base font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-transform hover:-translate-y-1">
-              Start free trial
-            </Link>
-          </div>
-          <div className="flex-1 w-full max-w-md perspective-1000">
-            <motion.div 
-              initial={{ rotateY: -15, rotateX: 10 }}
-              animate={{ rotateY: 0, rotateX: 0 }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="w-full aspect-square rounded-[3rem] bg-[#0a0a0a] border border-white/10 relative overflow-hidden flex items-center justify-center p-10 shadow-2xl"
-            >
-              {/* Abstract decorative elements */}
-              <div className={`absolute top-0 right-0 w-80 h-80 ${data.glow} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2`}></div>
-              <div className={`absolute bottom-0 left-0 w-80 h-80 ${data.glow} rounded-full blur-3xl translate-y-1/2 -translate-x-1/2`}></div>
-              
-              <div className="relative z-10 w-full h-full bg-[#111111]/80 backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl flex flex-col p-6 ring-1 ring-white/5">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className={`w-12 h-12 rounded-xl ${data.color} border flex items-center justify-center`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <div className="h-6 w-32 bg-white/5 rounded-md"></div>
-                </div>
-                <div className="space-y-4">
-                  <div className="h-4 w-full bg-white/5 rounded-md"></div>
-                  <div className="h-4 w-5/6 bg-white/5 rounded-md"></div>
-                  <div className="h-4 w-4/6 bg-white/5 rounded-md"></div>
-                </div>
-                <div className="mt-auto pt-6 border-t border-white/5 grid grid-cols-2 gap-4">
-                   <div className="h-20 bg-white/5 rounded-xl border border-white/5"></div>
-                   <div className="h-20 bg-white/5 rounded-xl border border-white/5"></div>
-                </div>
+    <div className="w-full bg-[var(--color-paper)] min-h-screen border-t border-[var(--color-rule)]">
+      <div className="py-24 px-6 max-w-[1120px] mx-auto min-h-[80vh]">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <Link href="/" className="text-sm font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] mb-12 inline-flex items-center gap-2 transition-colors">
+            &larr; Retour à l&apos;accueil
+          </Link>
+          
+          <div className="flex flex-col md:flex-row gap-16 items-center">
+            <div className="flex-1">
+              <div className={`w-16 h-16 rounded-[2px] bg-[var(--color-paper-deep)] border border-[var(--color-rule)] flex items-center justify-center mb-8 ${data.theme}`}>
+                <Icon className="w-8 h-8" />
               </div>
-            </motion.div>
+              <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-[var(--font-bricolage)] font-bold text-[var(--color-ink)] mb-6 tracking-[-0.03em] leading-tight">
+                {data.title}
+              </h1>
+              <p className="text-xl text-[var(--color-ink-soft)] mb-10 leading-relaxed max-w-lg">
+                {data.subtitle}
+              </p>
+              <ul className="space-y-4 mb-12 border-l border-[var(--color-rule)] pl-6">
+                {data.features.map((f, i) => (
+                  <li key={i} className="flex items-center text-[var(--color-ink)] text-lg">
+                    <span className={`mr-4 font-bold ${data.theme}`}>·</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-4">
+                <Link href="/signup" className="inline-block bg-[var(--color-cachet)] text-white px-8 py-3 rounded-[6px] font-bold hover:-translate-y-[1px] transition-all shadow-sm">
+                  Commencer
+                </Link>
+                <Link href="/company/contact" className="inline-block text-[var(--color-ink)] bg-[var(--color-paper-deep)] border border-[var(--color-rule)] px-8 py-3 rounded-[6px] font-bold hover:bg-[var(--color-paper)] hover:-translate-y-[1px] transition-all">
+                  Démo
+                </Link>
+              </div>
+            </div>
+            
+            <div className="flex-1 w-full max-w-md">
+              <div className="w-full aspect-[4/5] bg-[var(--color-paper-deep)] border border-[var(--color-rule)] p-8 flex flex-col font-mono text-[var(--color-ink)] text-sm relative shadow-sm">
+                
+                {/* Document Mockup Header */}
+                <div className="flex justify-between items-start mb-12 border-b border-[var(--color-rule)] pb-6">
+                  <div>
+                    <div className="font-bold text-lg">{data.title}</div>
+                    <div className="text-[var(--color-ink-soft)]">Module NexaERP</div>
+                  </div>
+                  <div className={`w-10 h-10 ${data.theme}`}>
+                    <Icon className="w-full h-full" />
+                  </div>
+                </div>
+                
+                {/* Document Mockup Body Lines */}
+                <div className="space-y-6 flex-grow">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex justify-between items-center border-b border-[var(--color-rule)] pb-2 border-dashed">
+                      <div className="h-4 w-1/2 bg-[var(--color-rule)] rounded-sm"></div>
+                      <div className="h-4 w-1/4 bg-[var(--color-rule)] rounded-sm"></div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Document Mockup Footer */}
+                <div className="mt-auto pt-6 border-t-[3px] border-double border-[var(--color-ink)] flex justify-between items-end">
+                  <div className="text-xs text-[var(--color-ink-soft)]">Système de gestion intégré</div>
+                  <div className="w-16 h-16 border-2 border-[var(--color-rule)] rounded-full flex items-center justify-center opacity-50">
+                    <span className="text-[8px] uppercase tracking-widest rotate-[-15deg]">Approuvé</span>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }
